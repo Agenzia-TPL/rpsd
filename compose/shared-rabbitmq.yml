@@ -4,8 +4,8 @@ services:
     container_name: rpsd-rabbitmq
     profiles: ["rabbitmq", "messaging", "shared", "all"]
     ports:
-      - "${RPSD_RABBITMQ_PORT:-5672}:5672"
-      - "${RPSD_RABBITMQ_MGMT_PORT:-15672}:15672"
+      - "${RPSD_RABBITMQ_PORT:-19100}:5672"
+      - "${RPSD_RABBITMQ_MGMT_PORT:-19110}:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${RPSD_RABBITMQ_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RPSD_RABBITMQ_PASS:-guest}

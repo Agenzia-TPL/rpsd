@@ -25,6 +25,7 @@ All architectural decisions are recorded in `DECISIONS.md`. That file is the aut
 - Every `image:` value uses a variable with a default: `${RPSD_IMAGE_X:-public/image:tag}`
 - Profiles control selective start/stop — see `DECISIONS.md` § 7
 - All services join `rpsd-network` — see `DECISIONS.md` § 18
+- Host port defaults follow the `19xxx`/`20xxx` schema — see `DECISIONS.md` § 20; never use standard ports as defaults
 
 ### Environment Files
 - Follow the `.env.XXX.example` → `.env.base` → `.env` pattern from `DECISIONS.md` § 9

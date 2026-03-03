@@ -54,7 +54,7 @@ services:
       # Result persistence
       PREFECT_RESULTS_PERSIST_BY_DEFAULT: "true"
     ports:
-      - "${RPSD_PREFECT_PORT:-4200}:4200"
+      - "${RPSD_PREFECT_PORT:-19200}:4200"
     depends_on:
       prefect-db:
         condition: service_healthy

@@ -83,22 +83,22 @@ echo -e "${YELLOW}Connection Information:${NC}"
 echo ""
 if docker ps --filter "name=^rpsd-kafka$" --format "{{.Names}}" | grep -q "^rpsd-kafka$"; then
   echo -e "  Kafka:            kafka:9092 (from containers)"
-  echo -e "  Kafka UI:         http://localhost:${RPSD_KAFKA_UI_PORT:-8080}"
-  echo -e "  Schema Registry:  http://localhost:${RPSD_SCHEMA_REGISTRY_PORT:-8081}"
+  echo -e "  Kafka UI:         http://localhost:${RPSD_KAFKA_UI_PORT:-19010}"
+  echo -e "  Schema Registry:  http://localhost:${RPSD_SCHEMA_REGISTRY_PORT:-19020}"
 fi
 if docker ps --filter "name=^rpsd-rabbitmq$" --format "{{.Names}}" | grep -q "^rpsd-rabbitmq$"; then
   echo -e "  RabbitMQ:         amqp://guest:guest@rabbitmq/ (from containers)"
-  echo -e "  RabbitMQ UI:      http://localhost:${RPSD_RABBITMQ_MGMT_PORT:-15672}"
+  echo -e "  RabbitMQ UI:      http://localhost:${RPSD_RABBITMQ_MGMT_PORT:-19110}"
 fi
 if docker ps --filter "name=^rpsd-prefect$" --format "{{.Names}}" | grep -q "^rpsd-prefect$"; then
   echo -e "  Prefect API:      http://prefect:4200/api (from containers)"
-  echo -e "  Prefect UI:       http://localhost:${RPSD_PREFECT_PORT:-4200}"
+  echo -e "  Prefect UI:       http://localhost:${RPSD_PREFECT_PORT:-19200}"
 fi
 if docker ps --filter "name=^rpsd-keycloak$" --format "{{.Names}}" | grep -q "^rpsd-keycloak$"; then
-  echo -e "  Keycloak:         http://localhost:${RPSD_KEYCLOAK_PORT:-18080}"
+  echo -e "  Keycloak:         http://localhost:${RPSD_KEYCLOAK_PORT:-19300}"
 fi
 if docker ps --filter "name=^rpsd-config-db$" --format "{{.Names}}" | grep -q "^rpsd-config-db$"; then
   echo -e "  config-db:        config-db:5432 (from containers)"
-  echo -e "                    localhost:${RPSD_CONFIG_DB_PORT:-5432} (from host)"
+  echo -e "                    localhost:${RPSD_CONFIG_DB_PORT:-20140} (from host)"
 fi
 echo ""

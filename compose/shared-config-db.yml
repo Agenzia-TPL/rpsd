@@ -19,7 +19,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "${RPSD_CONFIG_DB_PORT:-5432}:5432"
+      - "${RPSD_CONFIG_DB_PORT:-20140}:5432"
     networks:
       - rpsd-network
 

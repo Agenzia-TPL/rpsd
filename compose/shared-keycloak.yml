@@ -37,7 +37,7 @@ services:
       keycloak-db:
         condition: service_healthy
     ports:
-      - "${RPSD_KEYCLOAK_PORT:-18080}:8080"
+      - "${RPSD_KEYCLOAK_PORT:-19300}:8080"
     volumes:
       - rpsd-keycloak-data:/opt/keycloak/data
       - ../shared/keycloak/realm-import:/opt/keycloak/data/import:ro

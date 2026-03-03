@@ -362,3 +362,57 @@ compose/
 - Having two authoritative sources for the same service configuration will eventually diverge
 - The sibling-repo configs were the right starting point for understanding what needed to be migrated; keeping them during bringup reduces risk
 - Once verified, removal from sibling repos is straightforward and makes the platform easier to reason about
+
+---
+
+## 20. Host Port Allocation Schema
+
+**Decision:** All host port mappings follow a structured numbering schema using two dedicated thousand-ranges:
+
+- **`19xxx`** — shared infrastructure services
+- **`20xxx`** — rpsd application services (including their dedicated databases)
+
+This avoids conflicts with well-known ports commonly running on developer machines (PostgreSQL 5432, Kafka 9092, Redis 6379, etc.) and with OS ephemeral port ranges (Linux 32768+, macOS 49152+).
+
+### Block Structure
+
+Each service group occupies a **100-port block** identified by the hundreds digit (e.g. `190xx`, `191xx`). Within each block, only ports `xx00–xx49` are used initially; `xx50–xx99` are **reserved** for future service insertion within the same block.
+
+### Sub-Offset Convention
+
+| Offset | Purpose |
+|---|---|
+| `xx00` | Primary protocol/API |
+| `xx01` | Secondary protocol |
+| `xx10` | Web UI / management |
+| `xx20` | Ancillary API |
+| `xx40` | Dedicated database |
+| `xx50–xx99` | Reserved for future expansion |
+
+### Current Assignments
+
+```
+SHARED (19xxx)                         APPLICATION (20xxx)
+190xx Kafka   19000 broker             200xx Ingest  20000 API
+              19001 KRaft              201xx Config  20100 API
+              19010 UI                               20140 config-db
+              19020 schema-registry    202xx Flow    20200 API (future)
+191xx Rabbit  19100 AMQP
+              19110 management
+192xx Prefect 19200 API+UI
+193xx Keycl.  19300 admin
+```
+
+### Growth Rules
+
+- **Insert between existing groups:** use the reserved `xx50–xx99` range within an adjacent block
+- **Exceed 10 groups:** extend to adjacent thousands — shared overflows into `18xxx`, application overflows into `21xxx`
+- **Service needs a dedicated database:** use offset `xx40` within its block (e.g. config-db at `20140` within rpsd-config's `201xx` block)
+
+### Rationale
+
+- **Two ranges** make shared infrastructure (19xxx) visually distinct from application services (20xxx)
+- **100-port blocks with reserved upper half** balance readability with growth capacity (10 groups now, expandable to 20, then further via overflow)
+- **Co-locating a service with its database** in the same block (e.g. rpsd-config at `20100` and config-db at `20140`) makes their relationship immediately obvious
+- **All ports are overridable** via `RPSD_*_PORT` environment variables, so developers who prefer standard ports can set them locally
+- Container-to-container communication is unaffected — services still use internal hostnames and standard container ports (e.g. `kafka:9092`, `config-db:5432`)
