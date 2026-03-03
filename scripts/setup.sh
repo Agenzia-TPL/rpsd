@@ -5,6 +5,27 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 echo -e "${GREEN}=== rpsd Platform Setup ===${NC}"
 echo ""
 
+# Parse flags
+SCENARIO="local-all-in-one"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --scenario)
+      SCENARIO="$2"
+      shift 2
+      ;;
+    *)
+      print_error "Unknown argument: $1"
+      echo "Usage: $0 [--scenario <name>]"
+      echo "  --scenario local-all-in-one    (default) all services run in Docker via rpsd"
+      echo "  --scenario local-devcontainer  service runs in devcontainer, shared services via rpsd"
+      exit 1
+      ;;
+  esac
+done
+
+print_info "Scenario: $SCENARIO"
+echo ""
+
 # -------------------------------------------------------------------------
 # Step 1: Create rpsd root .env from open-mode image defaults
 # -------------------------------------------------------------------------
@@ -32,15 +53,15 @@ for name in "${SERVICE_NAMES[@]}"; do
     continue
   fi
 
-  # Copy .env.local-all-in-one.example as .env.base in the service repo
-  local_example="$example_dir/.env.local-all-in-one.example"
+  # Copy the scenario example as .env.base in the service repo
+  local_example="$example_dir/.env.${SCENARIO}.example"
   if [ -f "$local_example" ] && [ ! -f "$repo_dir/.env.base" ]; then
     cp "$local_example" "$repo_dir/.env.base"
-    print_success "Created $name/.env.base from all-in-one example"
+    print_success "Created $name/.env.base from $SCENARIO example"
   elif [ -f "$repo_dir/.env.base" ]; then
     print_warn "$name/.env.base already exists — skipping"
   elif [ ! -f "$local_example" ]; then
-    print_warn "No env example found for $name — skipping"
+    print_warn "No $SCENARIO env example found for $name — skipping"
   fi
 
   # Create empty .env in service repo if not present
