@@ -13,3 +13,8 @@ mnt/
 # AI assistants local files
 CLAUDE.local.md
 .claude/settings.local.json
+ai-history.local.md
+CODEX.local.md
+codex-history.local.md
+.codex/
+.vscode-codex/
