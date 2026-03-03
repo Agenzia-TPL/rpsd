@@ -42,7 +42,7 @@ services:
       PREFECT_SERVER_API_HOST: 0.0.0.0
       PREFECT_SERVER_API_PORT: 4200
       PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${RPSD_PREFECT_DB_USER:-prefect}:${RPSD_PREFECT_DB_PASS:-prefect}@prefect-db:5432/${RPSD_PREFECT_DB_NAME:-prefect}
-      PREFECT_API_URL: http://localhost:4200/api
+      PREFECT_API_URL: http://localhost:${RPSD_PREFECT_PORT:-19200}/api
       # Redis messaging
       PREFECT_MESSAGING_BROKER: "prefect_redis.messaging"
       PREFECT_MESSAGING_CACHE: "prefect_redis.messaging"
