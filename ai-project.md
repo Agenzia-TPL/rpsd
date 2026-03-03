@@ -37,6 +37,14 @@ All architectural decisions are recorded in `DECISIONS.md`. That file is the aut
 - `repos.conf` lists managed repos (name + type) — see `DECISIONS.md` § 15
 - Git URLs are inferred from rpsd's own origin — see `DECISIONS.md` § 16
 
+### Image Management
+- All images must support **ARM64** (linux/arm64) — the platform targets Apple Silicon and ARM servers
+- PostgreSQL-based services standardize on `postgres:17` as the base version
+- Keycloak uses `quay.io/keycloak/keycloak:26.3`
+- The official `postgis/postgis` image does not support ARM64; a custom Dockerfile in `shared/config-db/` builds PostGIS from `postgres:17` + Debian packages instead
+- Database services use the `-db` naming suffix: `keycloak-db`, `config-db`, `prefect-db`
+- Open/managed mode defaults are in `env/.env.compose.images.open.example` and `env/.env.compose.images.managed.example` — see `DECISIONS.md` § 11
+
 ## Current Scope
 
 | Repository | Type | Status |
