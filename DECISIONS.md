@@ -124,7 +124,8 @@ rpsd/
       .env.example
     prefect/
       .env.example
-    postgis/               # PostGIS, not plain Postgres
+    config-db/             # PostgreSQL + PostGIS for rpsd-config
+      Dockerfile
       init.sql
       .env.example
 ```
@@ -254,7 +255,7 @@ Kubernetes deployments go exclusively through the CI pipeline. No developer runs
 rpsd/
   repos.conf           # managed repository manifest (see § 15)
   docker-compose.yml   # main compose entry point — includes compose/*
-  shared/              # shared service configs (Keycloak, Kafka, PostGIS, Prefect)
+  shared/              # shared service configs (Keycloak, Kafka, config-db, Prefect)
   compose/             # Docker Compose include files, one per shared service group
   env/                 # rpsd-level .env.XXX.example files per service + image refs
   scripts/             # clone-repos.sh, start-shared.sh, start-services.sh, etc.
@@ -319,7 +320,7 @@ compose/
   shared-rabbitmq.yml     # RabbitMQ
   shared-prefect.yml      # Prefect server + its Postgres + Redis
   shared-keycloak.yml     # Keycloak + its Postgres
-  shared-postgis.yml      # PostGIS (application database)
+  shared-config-db.yml    # PostgreSQL + PostGIS (rpsd-config database)
   services.yml            # rpsd-ingest, rpsd-config, ...
 ```
 
@@ -334,7 +335,7 @@ compose/
 
 ## 18. Shared Docker Network
 
-**Decision:** All shared services and application services join a single Docker network named `rpsd-network`. Containers reach each other by service name (e.g. `kafka:9092`, `postgis:5432`, `prefect:4200`).
+**Decision:** All shared services and application services join a single Docker network named `rpsd-network`. Containers reach each other by service name (e.g. `kafka:9092`, `config-db:5432`, `prefect:4200`).
 
 **Consequence for Kafka:** The existing `host-scripts` configuration advertised Kafka as `host.docker.internal:9092`, which was necessary when consumers lived in devcontainers connecting via the host. In `rpsd`, consumers are co-located on the same Docker network, so `KAFKA_ADVERTISED_LISTENERS` is set to `PLAINTEXT://kafka:9092` instead.
 
@@ -355,7 +356,7 @@ compose/
 | `rpsd-commons/host-scripts/rabbitmq/` | `compose/shared-rabbitmq.yml` + `shared/rabbitmq/` |
 | `rpsd-commons/host-scripts/prefect/` | `compose/shared-prefect.yml` + `shared/prefect/` |
 | `rpsd-config/.devcontainer/docker-compose-keycloak.yml` | `compose/shared-keycloak.yml` + `shared/keycloak/` |
-| `rpsd-config/.devcontainer/docker-compose-database.yml` | `compose/shared-postgis.yml` + `shared/postgis/` |
+| `rpsd-config/.devcontainer/docker-compose-database.yml` | `compose/shared-config-db.yml` + `shared/config-db/` |
 
 **Rationale:**
 - Having two authoritative sources for the same service configuration will eventually diverge

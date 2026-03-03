@@ -1,0 +1,28 @@
+services:
+  config-db:
+    build:
+      context: ../shared/config-db
+      dockerfile: Dockerfile
+    image: ${RPSD_IMAGE_CONFIG_DB:-rpsd-config-db:local}
+    container_name: rpsd-config-db
+    profiles: ["config-db", "shared", "all"]
+    environment:
+      POSTGRES_DB: ${RPSD_CONFIG_DB_NAME:-rpsd}
+      POSTGRES_USER: ${RPSD_CONFIG_DB_USER:-rpsd}
+      POSTGRES_PASSWORD: ${RPSD_CONFIG_DB_PASS:-rpsd}
+    volumes:
+      - rpsd-config-db-data:/var/lib/postgresql/data
+      - ../shared/config-db/init.sql:/docker-entrypoint-initdb.d/01-postgis.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rpsd"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "${RPSD_CONFIG_DB_PORT:-5432}:5432"
+    networks:
+      - rpsd-network
+
+volumes:
+  rpsd-config-db-data:
+    name: rpsd-config-db-data

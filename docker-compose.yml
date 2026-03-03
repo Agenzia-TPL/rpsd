@@ -14,7 +14,7 @@ include:
   - compose/shared-rabbitmq.yml
   - compose/shared-prefect.yml
   - compose/shared-keycloak.yml
-  - compose/shared-postgis.yml
+  - compose/shared-config-db.yml
   - compose/services.yml
 
 networks:

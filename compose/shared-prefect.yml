@@ -1,14 +1,14 @@
 services:
-  prefect-postgres:
-    image: ${RPSD_IMAGE_PREFECT_POSTGRES:-postgres:17}
-    container_name: rpsd-prefect-postgres
+  prefect-db:
+    image: ${RPSD_IMAGE_PREFECT_DB:-postgres:17}
+    container_name: rpsd-prefect-db
     profiles: ["prefect", "shared", "all"]
     environment:
       POSTGRES_USER: ${RPSD_PREFECT_DB_USER:-prefect}
       POSTGRES_PASSWORD: ${RPSD_PREFECT_DB_PASS:-prefect}
       POSTGRES_DB: ${RPSD_PREFECT_DB_NAME:-prefect}
     volumes:
-      - rpsd-prefect-postgres-data:/var/lib/postgresql/data
+      - rpsd-prefect-db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U prefect"]
       interval: 10s
@@ -41,7 +41,7 @@ services:
     environment:
       PREFECT_SERVER_API_HOST: 0.0.0.0
       PREFECT_SERVER_API_PORT: 4200
-      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${RPSD_PREFECT_DB_USER:-prefect}:${RPSD_PREFECT_DB_PASS:-prefect}@prefect-postgres:5432/${RPSD_PREFECT_DB_NAME:-prefect}
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${RPSD_PREFECT_DB_USER:-prefect}:${RPSD_PREFECT_DB_PASS:-prefect}@prefect-db:5432/${RPSD_PREFECT_DB_NAME:-prefect}
       PREFECT_API_URL: http://localhost:4200/api
       # Redis messaging
       PREFECT_MESSAGING_BROKER: "prefect_redis.messaging"
@@ -56,7 +56,7 @@ services:
     ports:
       - "${RPSD_PREFECT_PORT:-4200}:4200"
     depends_on:
-      prefect-postgres:
+      prefect-db:
         condition: service_healthy
       prefect-redis:
         condition: service_healthy
@@ -71,7 +71,7 @@ services:
       - rpsd-network
 
 volumes:
-  rpsd-prefect-postgres-data:
-    name: rpsd-prefect-postgres-data
+  rpsd-prefect-db-data:
+    name: rpsd-prefect-db-data
   rpsd-prefect-redis-data:
     name: rpsd-prefect-redis-data

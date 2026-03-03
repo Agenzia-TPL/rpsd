@@ -37,7 +37,7 @@ SHARED_CONTAINERS=(
   rpsd-rabbitmq
   rpsd-prefect
   rpsd-keycloak
-  rpsd-postgis
+  rpsd-config-db
 )
 
 print_info "Waiting for services to become healthy..."
@@ -97,8 +97,8 @@ fi
 if docker ps --filter "name=^rpsd-keycloak$" --format "{{.Names}}" | grep -q "^rpsd-keycloak$"; then
   echo -e "  Keycloak:         http://localhost:${RPSD_KEYCLOAK_PORT:-18080}"
 fi
-if docker ps --filter "name=^rpsd-postgis$" --format "{{.Names}}" | grep -q "^rpsd-postgis$"; then
-  echo -e "  PostGIS:          postgis:5432 (from containers)"
-  echo -e "                    localhost:${RPSD_POSTGIS_PORT:-5432} (from host)"
+if docker ps --filter "name=^rpsd-config-db$" --format "{{.Names}}" | grep -q "^rpsd-config-db$"; then
+  echo -e "  config-db:        config-db:5432 (from containers)"
+  echo -e "                    localhost:${RPSD_CONFIG_DB_PORT:-5432} (from host)"
 fi
 echo ""

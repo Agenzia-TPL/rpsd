@@ -41,7 +41,7 @@ services:
       - ../../rpsd-config/.env.base:/app/.env.base:ro
       - ../../rpsd-config/.env:/app/.env:ro
     depends_on:
-      postgis:
+      config-db:
         condition: service_healthy
         required: false
       keycloak:

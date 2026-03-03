@@ -64,7 +64,7 @@ rpsd/
 | `rabbitmq` | RabbitMQ |
 | `prefect` | Prefect server, Postgres, Redis |
 | `keycloak` | Keycloak, Postgres |
-| `postgis` | PostGIS |
+| `config-db` | PostgreSQL + PostGIS (rpsd-config database) |
 | `shared` | All shared infrastructure |
 | `ingest` | rpsd-ingest |
 | `config` | rpsd-config |

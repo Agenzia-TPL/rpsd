@@ -1,6 +1,6 @@
 services:
   keycloak-db:
-    image: ${RPSD_IMAGE_KEYCLOAK_DB:-postgres:16-alpine}
+    image: ${RPSD_IMAGE_KEYCLOAK_DB:-postgres:17}
     container_name: rpsd-keycloak-db
     profiles: ["keycloak", "shared", "all"]
     environment:
@@ -18,7 +18,7 @@ services:
       - rpsd-network
 
   keycloak:
-    image: ${RPSD_IMAGE_KEYCLOAK:-quay.io/keycloak/keycloak:26.0}
+    image: ${RPSD_IMAGE_KEYCLOAK:-quay.io/keycloak/keycloak:26.3}
     container_name: rpsd-keycloak
     profiles: ["keycloak", "shared", "all"]
     command: ["start-dev", "--import-realm"]
