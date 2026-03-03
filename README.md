@@ -49,12 +49,19 @@ rpsd/
 | Script | Purpose |
 |--------|---------|
 | `clone-repos.sh` | Clone all repos listed in `repos.conf` |
-| `setup.sh` | Create `.env` files from examples |
+| `setup.sh [--scenario name] [--service name] [--force]` | Copy env templates into sibling service repos |
 | `start-shared.sh [profiles...]` | Start shared infrastructure |
 | `stop-shared.sh [profiles...] [--clean]` | Stop shared infrastructure |
 | `start-services.sh [--except svc] [--build]` | Start application services |
 | `stop-services.sh` | Stop application services |
 | `status.sh` | Show platform status |
+
+`setup.sh` supports two scenarios (pass `--help` for the full reference):
+
+| Scenario | When to use |
+|---|---|
+| `local-all-in-one` (default) | Everything runs in Docker via rpsd |
+| `local-devcontainer` | A service runs in its own devcontainer; shared services via rpsd |
 
 ## Docker Compose Profiles
 
@@ -70,6 +77,46 @@ rpsd/
 | `config` | rpsd-config |
 | `services` | All application services |
 | `all` | Everything |
+
+## Devcontainer Workflow
+
+When actively developing a service in its own devcontainer, run the shared platform on the host and exclude that service from rpsd's application stack:
+
+```bash
+# 1. First-time setup: set up all services with the all-in-one env
+scripts/setup.sh
+
+# 2. Override only the service you're developing with the devcontainer env
+#    (uses host.docker.internal addresses instead of container hostnames)
+scripts/setup.sh --service rpsd-config --scenario local-devcontainer --force
+
+# 3. Start shared infrastructure as normal
+scripts/start-shared.sh
+
+# 4. Start OTHER application services in Docker (exclude yours)
+scripts/start-services.sh --except rpsd-config
+
+# 5. Open the service in its own devcontainer and start it there
+```
+
+The `--service` flag in `setup.sh` and the `--except` flag in `start-services.sh` take the same service name. On Linux devcontainers, `host.docker.internal` may require adding `"--add-host=host.docker.internal:host-gateway"` to the devcontainer's `runArgs`.
+
+## Service Ports
+
+All host port mappings follow the `19xxx` / `20xxx` schema to avoid conflicts with services typically running on developer machines. Container-to-container communication is unaffected and uses standard ports.
+
+```
+SHARED (19xxx)                         APPLICATION (20xxx)
+190xx Kafka   19000 broker             200xx Ingest  20000 API
+              19010 UI                 201xx Config  20100 API
+              19020 schema-registry                  20140 config-db
+191xx Rabbit  19100 AMQP
+              19110 management
+192xx Prefect 19200 API+UI
+193xx Keycl.  19300 admin
+```
+
+All ports are overridable via `RPSD_*_PORT` variables in `.env`. See `DECISIONS.md` § 20 for the full schema and growth rules.
 
 ## Environment Files
 
