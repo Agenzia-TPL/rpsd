@@ -89,7 +89,7 @@ This document is intended as a reference and starting point for implementing the
 3. `stop-shared.sh`
 4. `start-services.sh --except <service>` — start all rpsd-* services except specified ones
 5. `stop-services.sh`
-6. Possibly `logs.sh` / `status.sh`
+6. `status.sh` — show running containers and clone status of managed repos
 
 ---
 
@@ -116,17 +116,20 @@ This allows a developer to start all services except the one they are actively d
 rpsd/
   shared/
     keycloak/
-      realm-export.json
-      .env.dev.example
-      .env.prod.example
-    kafka/          # or rabbitmq/
-      .env.dev.example
-      .env.prod.example
-    postgres/
+      realm-import/        # realm JSON files imported by Keycloak on startup
+      .env.example
+    kafka/
+      .env.example
+    rabbitmq/
+      .env.example
+    prefect/
+      .env.example
+    postgis/               # PostGIS, not plain Postgres
       init.sql
-      .env.dev.example
-      .env.prod.example
+      .env.example
 ```
+
+The `.env.example` files under `shared/` document only the variables that developers commonly override (ports, credentials). Everything else is hardcoded in the corresponding compose file with `${VAR:-default}` fallbacks.
 
 ---
 
@@ -249,12 +252,112 @@ Kubernetes deployments go exclusively through the CI pipeline. No developer runs
 
 ```
 rpsd/
-  shared/              # shared service configs (Keycloak, Kafka, Postgres, Prefect)
-  env/                 # rpsd-level .env.XXX.example files per service and environment
-  images/              # image reference files (open vs managed mode)
-  stacks/              # Docker Swarm stack files
-  charts/              # Helm charts for Kubernetes
-  manifests/           # raw k8s manifests if not using Helm
+  repos.conf           # managed repository manifest (see § 15)
+  docker-compose.yml   # main compose entry point — includes compose/*
+  shared/              # shared service configs (Keycloak, Kafka, PostGIS, Prefect)
+  compose/             # Docker Compose include files, one per shared service group
+  env/                 # rpsd-level .env.XXX.example files per service + image refs
   scripts/             # clone-repos.sh, start-shared.sh, start-services.sh, etc.
-  .github/workflows/   # or .gitlab-ci.yml
+  stacks/              # Docker Swarm stack files (future)
+  charts/              # Helm charts for Kubernetes (future)
+  manifests/           # raw k8s manifests if not using Helm (future)
+  .github/workflows/   # CI/CD pipelines (future)
 ```
+
+---
+
+## 15. Managed Repository Manifest
+
+**Decision:** `rpsd` maintains an explicit list of managed repositories in `repos.conf`, rather than scanning the parent directory for `rpsd-*` siblings.
+
+```
+# NAME            TYPE
+rpsd-commons      library
+rpsd-ingest       service
+rpsd-config       service
+```
+
+Each line contains a repository name and a type:
+
+- **`service`** — a runnable application; gets a Docker Compose profile and is started by `start-services.sh`
+- **`library`** — a build dependency only; cloned by `clone-repos.sh` but has no compose profile
+
+**Rationale:**
+- The parent directory may contain unrelated `rpsd-*` repos (forks, experiments, archived services) that should not be touched
+- An explicit list makes the set of managed repos auditable and version-controlled
+- The type column keeps `start-services.sh` from trying to start libraries as services
+
+---
+
+## 16. Git Clone URL Inference
+
+**Decision:** `clone-repos.sh` derives sibling repository URLs automatically from `rpsd`'s own remote `origin`, rather than storing URLs in `repos.conf`.
+
+**Mechanism:** `git remote get-url origin` on the `rpsd` repo returns a URL such as `git@github.com:Rapsodia/rpsd.git`. The script strips the trailing repo name to obtain the organisation prefix (`git@github.com:Rapsodia`), then appends each name from `repos.conf` to form the full clone URL. This works identically for SSH and HTTPS remotes.
+
+**Fallback:** When `rpsd` has no remote configured (e.g. before it is pushed for the first time), the script exits with a clear error and instructions. A `--base-url` flag accepts the organisation prefix explicitly:
+
+```bash
+./scripts/clone-repos.sh --base-url git@github.com:Rapsodia
+./scripts/clone-repos.sh --base-url https://github.com/Rapsodia
+```
+
+**Rationale:**
+- URLs are never duplicated between `repos.conf` and git config
+- Works for any hosting provider (GitHub, GitLab, self-hosted) without changing the manifest
+- When the organisation or hosting changes, only `rpsd`'s own remote needs to be updated
+
+---
+
+## 17. Docker Compose File Structure
+
+**Decision:** `docker-compose.yml` at the repo root is the single entry point for all `docker compose` commands. It uses `include:` to delegate to smaller files in `compose/`:
+
+```
+compose/
+  shared-kafka.yml        # Kafka + Kafka UI + Schema Registry
+  shared-rabbitmq.yml     # RabbitMQ
+  shared-prefect.yml      # Prefect server + its Postgres + Redis
+  shared-keycloak.yml     # Keycloak + its Postgres
+  shared-postgis.yml      # PostGIS (application database)
+  services.yml            # rpsd-ingest, rpsd-config, ...
+```
+
+**Rationale:**
+- A single entry point means `docker compose` is always run from the repo root — no `-f` flag juggling
+- Splitting by service group keeps each file focused and easy to read
+- Adding a new shared service means adding one new file and one `include:` line
+
+**Path resolution note:** Paths inside included files (build contexts, volume mounts) resolve relative to the **included file's own directory**. Files in `compose/` therefore use `../../rpsd-ingest` to reach a sibling repo and `../shared/` to reach the `shared/` directory.
+
+---
+
+## 18. Shared Docker Network
+
+**Decision:** All shared services and application services join a single Docker network named `rpsd-network`. Containers reach each other by service name (e.g. `kafka:9092`, `postgis:5432`, `prefect:4200`).
+
+**Consequence for Kafka:** The existing `host-scripts` configuration advertised Kafka as `host.docker.internal:9092`, which was necessary when consumers lived in devcontainers connecting via the host. In `rpsd`, consumers are co-located on the same Docker network, so `KAFKA_ADVERTISED_LISTENERS` is set to `PLAINTEXT://kafka:9092` instead.
+
+**Rationale:**
+- A single network is the natural topology for the "all services together" scenario
+- Per-service networks (as used in the original host-scripts) would require each application container to join multiple networks, adding fragile configuration
+- Standalone devcontainer setups are unaffected — they retain their own compose files and networks
+
+---
+
+## 19. Consolidation of Shared Service Configs
+
+**Decision:** `rpsd` is the sole long-term home for shared service configurations. Equivalent configs that currently exist in sibling repos are temporary and will be removed once `rpsd` is working end-to-end.
+
+| Current location | Moves to `rpsd` |
+|---|---|
+| `rpsd-commons/host-scripts/kafka/` | `compose/shared-kafka.yml` + `shared/kafka/` |
+| `rpsd-commons/host-scripts/rabbitmq/` | `compose/shared-rabbitmq.yml` + `shared/rabbitmq/` |
+| `rpsd-commons/host-scripts/prefect/` | `compose/shared-prefect.yml` + `shared/prefect/` |
+| `rpsd-config/.devcontainer/docker-compose-keycloak.yml` | `compose/shared-keycloak.yml` + `shared/keycloak/` |
+| `rpsd-config/.devcontainer/docker-compose-database.yml` | `compose/shared-postgis.yml` + `shared/postgis/` |
+
+**Rationale:**
+- Having two authoritative sources for the same service configuration will eventually diverge
+- The sibling-repo configs were the right starting point for understanding what needed to be migrated; keeping them during bringup reduces risk
+- Once verified, removal from sibling repos is straightforward and makes the platform easier to reason about
