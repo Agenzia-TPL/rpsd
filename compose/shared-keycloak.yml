@@ -33,6 +33,16 @@ services:
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
       KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HEALTH_ENABLED: "true"
+    healthcheck:
+      # Health check runs INSIDE the keycloak container, so use localhost
+      # Management/health endpoints are always on port 9000
+      # Using bash TCP method since curl may not be available in Keycloak image
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
     depends_on:
       keycloak-db:
         condition: service_healthy

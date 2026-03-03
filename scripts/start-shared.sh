@@ -44,7 +44,12 @@ print_info "Waiting for services to become healthy..."
 for container in "${SHARED_CONTAINERS[@]}"; do
   # Only check containers that are actually running
   if docker ps --filter "name=^${container}$" --filter "status=running" --format "{{.Names}}" | grep -q "^${container}$"; then
-    if wait_healthy "$container" 90; then
+    # Keycloak has a 90s start_period + retries, so allow more time
+    local_timeout=90
+    if [ "$container" = "rpsd-keycloak" ]; then
+      local_timeout=200
+    fi
+    if wait_healthy "$container" "$local_timeout"; then
       print_success "$container is healthy"
     else
       print_warn "$container did not become healthy within timeout"
