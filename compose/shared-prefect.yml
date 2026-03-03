@@ -1,0 +1,77 @@
+services:
+  prefect-postgres:
+    image: ${RPSD_IMAGE_PREFECT_POSTGRES:-postgres:17}
+    container_name: rpsd-prefect-postgres
+    profiles: ["prefect", "shared", "all"]
+    environment:
+      POSTGRES_USER: ${RPSD_PREFECT_DB_USER:-prefect}
+      POSTGRES_PASSWORD: ${RPSD_PREFECT_DB_PASS:-prefect}
+      POSTGRES_DB: ${RPSD_PREFECT_DB_NAME:-prefect}
+    volumes:
+      - rpsd-prefect-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prefect"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - rpsd-network
+
+  prefect-redis:
+    image: ${RPSD_IMAGE_PREFECT_REDIS:-redis:8-alpine}
+    container_name: rpsd-prefect-redis
+    profiles: ["prefect", "shared", "all"]
+    volumes:
+      - rpsd-prefect-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - rpsd-network
+
+  prefect:
+    image: ${RPSD_IMAGE_PREFECT:-prefecthq/prefect:3-latest}
+    container_name: rpsd-prefect
+    profiles: ["prefect", "shared", "all"]
+    command: prefect server start --host 0.0.0.0
+    environment:
+      PREFECT_SERVER_API_HOST: 0.0.0.0
+      PREFECT_SERVER_API_PORT: 4200
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${RPSD_PREFECT_DB_USER:-prefect}:${RPSD_PREFECT_DB_PASS:-prefect}@prefect-postgres:5432/${RPSD_PREFECT_DB_NAME:-prefect}
+      PREFECT_API_URL: http://localhost:4200/api
+      # Redis messaging
+      PREFECT_MESSAGING_BROKER: "prefect_redis.messaging"
+      PREFECT_MESSAGING_CACHE: "prefect_redis.messaging"
+      PREFECT_REDIS_MESSAGING_HOST: "prefect-redis"
+      PREFECT_REDIS_MESSAGING_PORT: "6379"
+      PREFECT_REDIS_MESSAGING_DB: "0"
+      # Task scheduling
+      PREFECT_TASK_SCHEDULING_DEFAULT_STORAGE_BLOCK: "redis-storage"
+      # Result persistence
+      PREFECT_RESULTS_PERSIST_BY_DEFAULT: "true"
+    ports:
+      - "${RPSD_PREFECT_PORT:-4200}:4200"
+    depends_on:
+      prefect-postgres:
+        condition: service_healthy
+      prefect-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - rpsd-network
+
+volumes:
+  rpsd-prefect-postgres-data:
+    name: rpsd-prefect-postgres-data
+  rpsd-prefect-redis-data:
+    name: rpsd-prefect-redis-data

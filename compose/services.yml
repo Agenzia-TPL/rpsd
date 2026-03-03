@@ -1,0 +1,51 @@
+services:
+  rpsd-ingest:
+    build:
+      context: ../../rpsd-ingest
+      dockerfile: ./Dockerfile
+      additional_contexts:
+        rpsd-commons: ../../rpsd-commons
+    image: ${RPSD_IMAGE_INGEST:-rpsd-ingest:local}
+    container_name: rpsd-ingest
+    profiles: ["ingest", "services", "all"]
+    restart: unless-stopped
+    command: uv run server
+    ports:
+      - "${RPSD_INGEST_PORT:-8888}:8000"
+    volumes:
+      - ../../rpsd-ingest/.env.base:/app/.env.base:ro
+      - ../../rpsd-ingest/.env:/app/.env:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: false
+      rabbitmq:
+        condition: service_healthy
+        required: false
+    networks:
+      - rpsd-network
+
+  rpsd-config:
+    build:
+      context: ../../rpsd-config
+      dockerfile: ./.devcontainer/Dockerfile
+      target: production
+    image: ${RPSD_IMAGE_CONFIG:-rpsd-config:local}
+    container_name: rpsd-config
+    profiles: ["config", "services", "all"]
+    restart: unless-stopped
+    command: uv run server
+    ports:
+      - "${RPSD_CONFIG_PORT:-12080}:8000"
+    volumes:
+      - ../../rpsd-config/.env.base:/app/.env.base:ro
+      - ../../rpsd-config/.env:/app/.env:ro
+    depends_on:
+      postgis:
+        condition: service_healthy
+        required: false
+      keycloak:
+        condition: service_started
+        required: false
+    networks:
+      - rpsd-network

@@ -1,0 +1,104 @@
+#!/bin/bash
+set -e
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+
+require_docker
+
+echo -e "${GREEN}=== Starting Shared Services ===${NC}"
+echo ""
+
+# Default: start all shared infrastructure.
+# Override with arguments: ./start-shared.sh kafka prefect
+PROFILES=("${@}")
+if [ ${#PROFILES[@]} -eq 0 ]; then
+  PROFILES=("shared")
+fi
+
+# Build --profile flags
+PROFILE_FLAGS=""
+for p in "${PROFILES[@]}"; do
+  PROFILE_FLAGS="$PROFILE_FLAGS --profile $p"
+done
+
+print_info "Profiles: ${PROFILES[*]}"
+print_info "Starting services..."
+
+cd "$RPSD_ROOT"
+docker compose $PROFILE_FLAGS up -d
+
+echo ""
+
+# -------------------------------------------------------------------------
+# Wait for health checks
+# -------------------------------------------------------------------------
+
+SHARED_CONTAINERS=(
+  rpsd-kafka
+  rpsd-rabbitmq
+  rpsd-prefect
+  rpsd-keycloak
+  rpsd-postgis
+)
+
+print_info "Waiting for services to become healthy..."
+for container in "${SHARED_CONTAINERS[@]}"; do
+  # Only check containers that are actually running
+  if docker ps --filter "name=^${container}$" --filter "status=running" --format "{{.Names}}" | grep -q "^${container}$"; then
+    if wait_healthy "$container" 90; then
+      print_success "$container is healthy"
+    else
+      print_warn "$container did not become healthy within timeout"
+    fi
+  fi
+done
+
+# -------------------------------------------------------------------------
+# Post-start hooks
+# -------------------------------------------------------------------------
+
+# Create Kafka topics if Kafka is running
+if docker ps --filter "name=^rpsd-kafka$" --filter "status=running" --format "{{.Names}}" | grep -q "^rpsd-kafka$"; then
+  print_info "Creating default Kafka topics..."
+  docker exec rpsd-kafka /opt/kafka/bin/kafka-topics.sh \
+    --bootstrap-server localhost:9092 \
+    --create --if-not-exists \
+    --topic enriched-events \
+    --partitions 3 \
+    --replication-factor 1 \
+    --config retention.ms=604800000 2>/dev/null && \
+    print_success "Topic 'enriched-events' ready" || \
+    print_warn "Topic creation skipped (will auto-create on first use)"
+fi
+
+# -------------------------------------------------------------------------
+# Status and connection info
+# -------------------------------------------------------------------------
+
+echo ""
+echo -e "${GREEN}=== Shared Services Status ===${NC}"
+docker compose $PROFILE_FLAGS ps
+echo ""
+
+echo -e "${YELLOW}Connection Information:${NC}"
+echo ""
+if docker ps --filter "name=^rpsd-kafka$" --format "{{.Names}}" | grep -q "^rpsd-kafka$"; then
+  echo -e "  Kafka:            kafka:9092 (from containers)"
+  echo -e "  Kafka UI:         http://localhost:${RPSD_KAFKA_UI_PORT:-8080}"
+  echo -e "  Schema Registry:  http://localhost:${RPSD_SCHEMA_REGISTRY_PORT:-8081}"
+fi
+if docker ps --filter "name=^rpsd-rabbitmq$" --format "{{.Names}}" | grep -q "^rpsd-rabbitmq$"; then
+  echo -e "  RabbitMQ:         amqp://guest:guest@rabbitmq/ (from containers)"
+  echo -e "  RabbitMQ UI:      http://localhost:${RPSD_RABBITMQ_MGMT_PORT:-15672}"
+fi
+if docker ps --filter "name=^rpsd-prefect$" --format "{{.Names}}" | grep -q "^rpsd-prefect$"; then
+  echo -e "  Prefect API:      http://prefect:4200/api (from containers)"
+  echo -e "  Prefect UI:       http://localhost:${RPSD_PREFECT_PORT:-4200}"
+fi
+if docker ps --filter "name=^rpsd-keycloak$" --format "{{.Names}}" | grep -q "^rpsd-keycloak$"; then
+  echo -e "  Keycloak:         http://localhost:${RPSD_KEYCLOAK_PORT:-18080}"
+fi
+if docker ps --filter "name=^rpsd-postgis$" --format "{{.Names}}" | grep -q "^rpsd-postgis$"; then
+  echo -e "  PostGIS:          postgis:5432 (from containers)"
+  echo -e "                    localhost:${RPSD_POSTGIS_PORT:-5432} (from host)"
+fi
+echo ""

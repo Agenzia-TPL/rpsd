@@ -1,0 +1,51 @@
+services:
+  keycloak-db:
+    image: ${RPSD_IMAGE_KEYCLOAK_DB:-postgres:16-alpine}
+    container_name: rpsd-keycloak-db
+    profiles: ["keycloak", "shared", "all"]
+    environment:
+      POSTGRES_DB: ${RPSD_KEYCLOAK_DB_NAME:-keycloak}
+      POSTGRES_USER: ${RPSD_KEYCLOAK_DB_USER:-keycloak}
+      POSTGRES_PASSWORD: ${RPSD_KEYCLOAK_DB_PASS:-keycloak}
+    volumes:
+      - rpsd-keycloak-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rpsd-network
+
+  keycloak:
+    image: ${RPSD_IMAGE_KEYCLOAK:-quay.io/keycloak/keycloak:26.0}
+    container_name: rpsd-keycloak
+    profiles: ["keycloak", "shared", "all"]
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-db
+      KC_DB_URL_DATABASE: ${RPSD_KEYCLOAK_DB_NAME:-keycloak}
+      KC_DB_USERNAME: ${RPSD_KEYCLOAK_DB_USER:-keycloak}
+      KC_DB_PASSWORD: ${RPSD_KEYCLOAK_DB_PASS:-keycloak}
+      KEYCLOAK_ADMIN: ${RPSD_KEYCLOAK_ADMIN_USER:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${RPSD_KEYCLOAK_ADMIN_PASS:-admin}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    ports:
+      - "${RPSD_KEYCLOAK_PORT:-18080}:8080"
+    volumes:
+      - rpsd-keycloak-data:/opt/keycloak/data
+      - ../shared/keycloak/realm-import:/opt/keycloak/data/import:ro
+    networks:
+      - rpsd-network
+
+volumes:
+  rpsd-keycloak-db-data:
+    name: rpsd-keycloak-db-data
+  rpsd-keycloak-data:
+    name: rpsd-keycloak-data

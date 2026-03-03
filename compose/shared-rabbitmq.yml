@@ -1,0 +1,25 @@
+services:
+  rabbitmq:
+    image: ${RPSD_IMAGE_RABBITMQ:-rabbitmq:3-management-alpine}
+    container_name: rpsd-rabbitmq
+    profiles: ["rabbitmq", "messaging", "shared", "all"]
+    ports:
+      - "${RPSD_RABBITMQ_PORT:-5672}:5672"
+      - "${RPSD_RABBITMQ_MGMT_PORT:-15672}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RPSD_RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RPSD_RABBITMQ_PASS:-guest}
+    volumes:
+      - rpsd-rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - rpsd-network
+
+volumes:
+  rpsd-rabbitmq-data:
+    name: rpsd-rabbitmq-data

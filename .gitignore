@@ -1,0 +1,15 @@
+# Environment files (gitignored — never committed)
+.env
+.env.base
+.env.local
+.env.compose.images
+
+# Mounted data
+mnt/
+
+# macOS
+.DS_Store
+
+# AI assistants local files
+CLAUDE.local.md
+.claude/settings.local.json
