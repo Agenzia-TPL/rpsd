@@ -30,9 +30,8 @@ services:
       KC_DB_PASSWORD: ${RPSD_KEYCLOAK_DB_PASS:-keycloak}
       KEYCLOAK_ADMIN: ${RPSD_KEYCLOAK_ADMIN_USER:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${RPSD_KEYCLOAK_ADMIN_PASS:-admin}
-      KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
-      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HOSTNAME: http://localhost:${RPSD_KEYCLOAK_PORT:-19300}
       KC_HEALTH_ENABLED: "true"
     healthcheck:
       # Health check runs INSIDE the keycloak container, so use localhost

@@ -61,6 +61,26 @@ done
 # Post-start hooks
 # -------------------------------------------------------------------------
 
+# Ensure Keycloak realms allow plain HTTP (dev mode)
+if docker ps --filter "name=^rpsd-keycloak$" --filter "status=running" --format "{{.Names}}" | grep -q "^rpsd-keycloak$"; then
+  print_info "Configuring Keycloak realms for HTTP access..."
+  KC_ADMIN="${RPSD_KEYCLOAK_ADMIN_USER:-admin}"
+  KC_PASS="${RPSD_KEYCLOAK_ADMIN_PASS:-admin}"
+  KC_CMD="/opt/keycloak/bin/kcadm.sh"
+  # Authenticate to Keycloak admin CLI
+  if docker exec rpsd-keycloak "$KC_CMD" config credentials \
+      --server http://localhost:8080 --realm master \
+      --user "$KC_ADMIN" --password "$KC_PASS" 2>/dev/null; then
+    # Disable SSL requirement on all existing realms
+    for realm in $(docker exec rpsd-keycloak "$KC_CMD" get realms --fields realm --format csv --noquotes 2>/dev/null); do
+      docker exec rpsd-keycloak "$KC_CMD" update "realms/$realm" -s sslRequired=NONE 2>/dev/null
+    done
+    print_success "Keycloak realms configured for HTTP"
+  else
+    print_warn "Could not configure Keycloak realms (admin CLI auth failed)"
+  fi
+fi
+
 # Create Kafka topics if Kafka is running
 if docker ps --filter "name=^rpsd-kafka$" --filter "status=running" --format "{{.Names}}" | grep -q "^rpsd-kafka$"; then
   print_info "Creating default Kafka topics..."
