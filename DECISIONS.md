@@ -416,3 +416,113 @@ SHARED (19xxx)                         APPLICATION (20xxx)
 - **Co-locating a service with its database** in the same block (e.g. rpsd-config at `20100` and config-db at `20140`) makes their relationship immediately obvious
 - **All ports are overridable** via `RPSD_*_PORT` environment variables, so developers who prefer standard ports can set them locally
 - Container-to-container communication is unaffected — services still use internal hostnames and standard container ports (e.g. `kafka:9092`, `config-db:5432`)
+
+---
+
+## 21. CI/CD Platform (Open Mode)
+
+**Decision:** GitHub Actions is the open-mode CI/CD platform for the `rpsd` platform.
+
+**Structure (per §13):**
+
+- **Per-service repos** (`rpsd-ingest`, `rpsd-config`, `rpsd-commons`): run tests, build image, push to registry
+- **`rpsd`**: builds shared images (e.g. `config-db`) and holds deployment definitions
+
+**Rationale:**
+
+- All repositories are on GitHub; GitHub Actions requires no additional infrastructure
+- Integrators on other CI platforms (GitLab CI, Jenkins, etc.) can replicate the workflows — they perform standard steps (checkout, buildx, push) with no GitHub-specific magic
+- `GITHUB_TOKEN` (auto-provided) covers image pushes to ghcr.io without extra credentials; the only additional secret needed is `GH_REPO_TOKEN` for cross-repo checkout (rpsd-ingest → rpsd-commons)
+
+---
+
+## 22. Image Registry (Open Mode)
+
+**Decision:** `ghcr.io` (GitHub Container Registry) is the open-mode container registry.
+
+Images are published under `ghcr.io/rapsodia/rpsd-<service>`.
+
+| Image | Registry path |
+|---|---|
+| rpsd-ingest | `ghcr.io/rapsodia/rpsd-ingest` |
+| rpsd-config | `ghcr.io/rapsodia/rpsd-config` |
+| config-db | `ghcr.io/rapsodia/rpsd-config-db` |
+
+**Rationale:**
+
+- ghcr.io is tightly integrated with GitHub Actions; pushing images requires only the auto-provided `GITHUB_TOKEN`
+- The existing image variable abstraction (§11) lets integrators substitute their own registry without changing any code — they provide different `RPSD_IMAGE_*` values
+
+---
+
+## 23. Image Tagging Strategy
+
+**Decision:** Every main-branch push produces two tags:
+
+- `latest` — for convenient use in development and staging
+- `sha-<7-char-commit>` — for traceability and rollback
+
+Future release tags (e.g. `v1.2.3`) are added at release time via Git tags triggering the same workflow.
+
+**Rationale:**
+
+- SHA tags make it possible to know exactly which code is running and to roll back to a specific commit
+- `latest` keeps developer and staging workflows simple — no need to look up commit SHAs
+
+---
+
+## 24. Multi-Architecture Builds
+
+**Decision:** CI produces multi-architecture images (`linux/amd64`, `linux/arm64`) via Docker Buildx.
+
+**Rationale:**
+
+- ARM64 is required: developers use Apple Silicon and the platform targets ARM servers
+- AMD64 is included for x86 server compatibility
+- Multi-arch manifests are transparent to consumers — Docker automatically pulls the right variant
+
+---
+
+## 25. Docker Swarm Stack Files
+
+**Decision:** Docker Swarm stack files live in `stacks/` and are maintained separately from Docker Compose files in `compose/`.
+
+**Stack files vs Compose files:**
+
+| Feature | Compose (`compose/`) | Swarm (`stacks/`) |
+|---|---|---|
+| `build:` | Yes — used for local dev | No — images must come from registry |
+| `depends_on:` | Yes | No — Swarm ignores it |
+| `profiles:` | Yes | No — Swarm ignores it |
+| `deploy:` | Ignored | Yes — replicas, update policy, etc. |
+| Secrets | Bind-mounted env files | Docker Secrets |
+| Network driver | `bridge` | `overlay` |
+
+A single `stacks/rpsd-stack.yml` covers all services. Stack files use the same `RPSD_IMAGE_*` variables as compose files, so the open/managed mode distinction (§11) applies unchanged.
+
+**Sensitive credentials** are managed via Docker Secrets (`external: true`), which must be created before deploying:
+
+```bash
+printf 'password' | docker secret create rpsd_config_db_pass -
+```
+
+PostgreSQL images natively support `POSTGRES_PASSWORD_FILE`; Keycloak supports `KC_DB_PASSWORD_FILE` and `KEYCLOAK_ADMIN_PASSWORD_FILE`; RabbitMQ supports `RABBITMQ_DEFAULT_PASS_FILE`.
+
+---
+
+## 26. Deployment Approach (Swarm)
+
+**Decision:** Initial deployments to Docker Swarm are manual — via `docker stack deploy` or via Portainer's Git-based stack feature. Automated CD from CI is not implemented in the first iteration.
+
+**Portainer workflow:**
+
+1. Point Portainer at the `rpsd` Git repository, selecting `stacks/rpsd-stack.yml`
+2. Set environment variables (image tags, hostnames, Prefect URL) in Portainer's stack env editor
+3. Portainer deploys the stack and can redeploy on demand or via webhook
+
+**Rationale:**
+
+- Manual deployment is sufficient for staging and reduces the blast radius of CI errors reaching the cluster
+- Portainer's Git integration provides a GitOps-like experience without additional tooling
+- Automated CD can be layered on later (a GitHub Actions deployment job that SSH-es into the Swarm manager)
+
