@@ -27,6 +27,11 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+          startupProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            periodSeconds: 5
+            failureThreshold: 20
           readinessProbe:
             exec:
               command: ["redis-cli", "ping"]

@@ -19,10 +19,23 @@ spec:
         app.kubernetes.io/component: application
         app.kubernetes.io/part-of: rpsd
     spec:
+      initContainers:
+        - name: wait-for-kafka
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z kafka 9092; do echo waiting for kafka; sleep 2; done"]
+        - name: wait-for-rabbitmq
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z rabbitmq 5672; do echo waiting for rabbitmq; sleep 2; done"]
+        - name: wait-for-prefect
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z prefect 4200; do echo waiting for prefect; sleep 2; done"]
+        - name: wait-for-rpsd-config
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z rpsd-config 8000; do echo waiting for rpsd-config; sleep 2; done"]
       containers:
         - name: rpsd-ingest
           image: ghcr.io/agenzia-tpl/rpsd-ingest:latest
-          command: ["uv", "run", "server"]
+          args: ["uv", "run", "server"]
           ports:
             - containerPort: 8000
               name: http

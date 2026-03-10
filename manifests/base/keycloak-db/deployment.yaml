@@ -38,16 +38,25 @@ spec:
             - name: data
               mountPath: /var/lib/postgresql/data
               subPath: pgdata
+          startupProbe:
+            exec:
+              command: ["pg_isready", "-U", "keycloak"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 20
+            timeoutSeconds: 5
           readinessProbe:
             exec:
               command: ["pg_isready", "-U", "keycloak"]
             initialDelaySeconds: 10
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
             exec:
               command: ["pg_isready", "-U", "keycloak"]
             initialDelaySeconds: 30
             periodSeconds: 20
+            timeoutSeconds: 5
       volumes:
         - name: data
           persistentVolumeClaim:
