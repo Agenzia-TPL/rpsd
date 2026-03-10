@@ -10,4 +10,4 @@ spec:
         - name: keycloak
           env:
             - name: KC_HOSTNAME
-              value: "http://keycloak.localhost"
+              value: "http://keycloak.localhost:19999"

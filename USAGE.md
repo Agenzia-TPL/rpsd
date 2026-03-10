@@ -349,12 +349,12 @@ minikube tunnel          # run in a separate terminal, keep it open
 
 | Service | URL |
 |---------|-----|
-| rpsd-ingest | http://ingest.localhost |
-| rpsd-config | http://config.localhost |
-| Keycloak | http://keycloak.localhost |
-| Prefect | http://prefect.localhost |
-| Kafka UI | http://kafka-ui.localhost |
-| RabbitMQ Mgmt | http://rabbitmq.localhost |
+| rpsd-ingest | http://ingest.localhost:19999 |
+| rpsd-config | http://config.localhost:19999 |
+| Keycloak | http://keycloak.localhost:19999 |
+| Prefect | http://prefect.localhost:19999 |
+| Kafka UI | http://kafka-ui.localhost:19999 |
+| RabbitMQ Mgmt | http://rabbitmq.localhost:19999 |
 
 **Fallback — port-forward** (if not using the Gateway):
 

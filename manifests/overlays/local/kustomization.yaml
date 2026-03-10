@@ -18,5 +18,15 @@ patches:
     patch: |
       - op: remove
         path: /metadata/namespace
+  # Gateway API: use non-privileged port for local development (avoids sudo for minikube tunnel)
+  - target:
+      group: gateway.networking.k8s.io
+      version: v1
+      kind: Gateway
+      name: rpsd-gateway
+    patch: |
+      - op: replace
+        path: /spec/listeners/0/port
+        value: 19999
   # NodePort fallback (uncomment if not using Gateway API):
   # - path: patches/services-nodeport.yaml
