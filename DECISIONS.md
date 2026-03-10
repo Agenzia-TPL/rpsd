@@ -526,3 +526,59 @@ PostgreSQL images natively support `POSTGRES_PASSWORD_FILE`; Keycloak supports `
 - Portainer's Git integration provides a GitOps-like experience without additional tooling
 - Automated CD can be layered on later (a GitHub Actions deployment job that SSH-es into the Swarm manager)
 
+---
+
+## 27. Kubernetes Manifests — Kustomize
+
+**Decision:** Kubernetes deployment manifests use **Kustomize** and live in `manifests/`. Helm is not used.
+
+**Structure:**
+
+```
+manifests/
+  base/                    # Environment-agnostic resources (all 12 services)
+    kustomization.yaml     # Lists all resource subdirectories
+    namespace.yaml         # Namespace: rpsd
+    secrets.yaml           # Single Secret with 5 keys (dev defaults)
+    kafka/                 # One subdirectory per service group
+    kafka-ui/
+    schema-registry/
+    rabbitmq/
+    prefect-db/
+    prefect-redis/
+    prefect/
+    keycloak-db/
+    keycloak/
+    config-db/
+    rpsd-ingest/
+    rpsd-config/
+  overlays/
+    local/                 # minikube / Docker Desktop (NodePort patches)
+    eks/                   # AWS EKS (StorageClass, Ingress, image tag pins)
+```
+
+Each service subdirectory contains a `kustomization.yaml`, `deployment.yaml`, `service.yaml`, and optionally `pvc.yaml` or `configmap.yaml`. Service names match Docker Compose service names (`kafka`, `config-db`, `rpsd-ingest`, etc.) so that inter-service URLs remain identical.
+
+**Rationale:**
+
+- Kustomize is built into `kubectl` — no additional binary, no chart repository, no release state in the cluster
+- Produces plain YAML that is easy to read, inspect, and diff in pull requests
+- FluxCD (mentioned as the target GitOps tool for integrators) natively supports Kustomization resources, making `manifests/overlays/eks/` directly deployable
+- The base + overlays pattern cleanly separates environment-agnostic resources from environment-specific patches (StorageClass, NodePort, image tags)
+- Follows the project principle of introducing complexity only when there is a concrete need; Helm can be layered on later if redistributable chart packaging becomes necessary
+- The `charts/` directory remains reserved for a potential future Helm chart
+
+**Relationship to Swarm stack:**
+
+The Kustomize manifests are a Kubernetes translation of `stacks/rpsd-stack.yml`. Key mapping:
+
+| Swarm concept | Kubernetes equivalent |
+|---|---|
+| Docker Secrets (external) | K8s Secret (`rpsd-secrets`) with `stringData` |
+| Docker Configs | K8s ConfigMap (`config-db-init`) |
+| Named volumes | PersistentVolumeClaims |
+| `overlay` network | Namespace-scoped DNS (service names) |
+| `deploy.replicas` | `spec.replicas` in Deployment |
+| `depends_on` | Init containers (`busybox nc -z`) |
+| `RPSD_IMAGE_*` env vars | Kustomize `images:` transformer in overlays |
+

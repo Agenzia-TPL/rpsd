@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rpsd-config
+  labels:
+    app.kubernetes.io/name: rpsd-config
+    app.kubernetes.io/component: application
+    app.kubernetes.io/part-of: rpsd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rpsd-config
+      app.kubernetes.io/part-of: rpsd
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rpsd-config
+        app.kubernetes.io/component: application
+        app.kubernetes.io/part-of: rpsd
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z config-db 5432; do echo waiting for config-db; sleep 2; done"]
+      containers:
+        - name: rpsd-config
+          image: ghcr.io/agenzia-tpl/rpsd-config:latest
+          command: ["uv", "run", "server"]
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: DATABASE_HOST
+              value: config-db
+            - name: DATABASE_PORT
+              value: "5432"
+            - name: DATABASE_NAME
+              value: rpsd
+            - name: DATABASE_USER
+              value: rpsd
+            - name: KEYCLOAK_URL
+              value: http://keycloak:8080

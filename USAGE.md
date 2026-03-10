@@ -272,6 +272,216 @@ If images are tagged with `latest`, enable **Re-pull image** to force a pull.
 
 ---
 
+## Kubernetes — Local (minikube / Docker Desktop)
+
+### Prerequisites
+
+- `kubectl`
+- [minikube](https://minikube.sigs.k8s.io/) **or** Docker Desktop with Kubernetes enabled
+
+### 1. Start the cluster
+
+**minikube:**
+```bash
+minikube start --memory=8192 --cpus=4
+```
+
+**Docker Desktop:** go to Settings → Kubernetes → Enable Kubernetes, then Apply & Restart.
+
+### 2. (Optional) Customise secrets
+
+The base manifests ship with dev-friendly default passwords. For local testing these are fine. To use custom passwords, edit `manifests/base/secrets.yaml` before deploying.
+
+### 3. Deploy
+
+Run from the repo root:
+
+```bash
+kubectl apply -k manifests/overlays/local/
+```
+
+### 4. Verify
+
+```bash
+# Watch pods start up (all 12 should reach Running)
+kubectl get pods -n rpsd -w
+
+# Verify persistent volumes are bound
+kubectl get pvc -n rpsd
+```
+
+### 5. Access services
+
+**Option A — port-forward:** creates a temporary tunnel from your local machine to the service,
+using the same port numbers as the rpsd schema. The `&` runs each tunnel as a background job
+in the same terminal — paste all lines at once and the prompt returns immediately. Tunnels
+stop when you close the shell or run `pkill kubectl`.
+
+```bash
+kubectl port-forward -n rpsd svc/kafka-ui        19010:8080  &
+kubectl port-forward -n rpsd svc/schema-registry 19020:8081  &
+kubectl port-forward -n rpsd svc/rabbitmq        19110:15672 &
+kubectl port-forward -n rpsd svc/prefect         19200:4200  &
+kubectl port-forward -n rpsd svc/keycloak        19300:8080  &
+kubectl port-forward -n rpsd svc/config-db       20140:5432  &
+kubectl port-forward -n rpsd svc/rpsd-ingest     20000:8000  &
+kubectl port-forward -n rpsd svc/rpsd-config     20100:8000  &
+```
+
+**Option B — NodePort:** the local overlay permanently exposes the UI/API services on host
+ports, so they stay accessible in the browser across terminal sessions. Kubernetes requires
+NodePort numbers to be in the 30000–32767 range (a cluster-wide hard constraint), so the
+ports differ from the rpsd schema — the overlay uses 30xxx numbers that mirror the original
+structure where possible (30010 ↔ 19010, 30200 ↔ 19200, etc.).
+
+> NodePort only works on local clusters where the K8s node is `localhost` (minikube or
+> Docker Desktop). On EKS, nodes are private EC2 instances, so NodePort is not reachable
+> from outside without a load balancer — use port-forward there instead.
+
+```bash
+kubectl get svc -n rpsd          # lists all NodePort assignments
+minikube service list            # minikube only — prints clickable URLs
+```
+
+### 6. Update a service
+
+```bash
+kubectl set image -n rpsd deployment/rpsd-ingest \
+  rpsd-ingest=ghcr.io/agenzia-tpl/rpsd-ingest:sha-abc1234
+```
+
+### 7. Teardown
+
+```bash
+# Remove all resources (keeps PVCs and their data)
+kubectl delete -k manifests/overlays/local/
+
+# Also delete persistent data
+kubectl delete pvc -n rpsd --all
+```
+
+---
+
+## Kubernetes — AWS EKS
+
+### Prerequisites
+
+- `kubectl`
+- AWS CLI configured (`aws configure`)
+- [`eksctl`](https://eksctl.io/) (for cluster creation — optional, can use AWS Console instead)
+
+### 1. Create an EKS cluster
+
+```bash
+eksctl create cluster \
+  --name rpsd \
+  --region eu-south-1 \
+  --node-type t3.xlarge \
+  --nodes 2
+```
+
+This takes ~15 minutes. `eksctl` automatically updates your kubeconfig.
+
+### 2. Verify kubectl context
+
+```bash
+kubectl config current-context   # should show something like: <email>@rpsd.eu-south-1.eksctl.io
+kubectl get nodes                # should list your worker nodes
+```
+
+### 3. Create secrets
+
+The base manifests include weak development defaults. **Do not use them in production.** Create the secret with real passwords before deploying:
+
+```bash
+kubectl create namespace rpsd
+
+kubectl create secret generic rpsd-secrets -n rpsd \
+  --from-literal=rpsd-keycloak-db-pass='<strong-password>' \
+  --from-literal=rpsd-keycloak-admin-pass='<strong-password>' \
+  --from-literal=rpsd-config-db-pass='<strong-password>' \
+  --from-literal=rpsd-prefect-db-pass='<strong-password>' \
+  --from-literal=rpsd-rabbitmq-pass='<strong-password>'
+```
+
+Use `openssl rand -base64 24` to generate each password.
+
+> **Production secret management:** for a more robust setup, use [AWS Secrets Manager](https://aws.amazon.com/secrets-manager/) together with the [External Secrets Operator](https://external-secrets.io/) to inject secrets into the cluster automatically.
+
+### 4. Pin image tags
+
+Edit `manifests/overlays/eks/kustomization.yaml` and uncomment the `images:` block with the specific commit SHA tags to deploy:
+
+```yaml
+images:
+  - name: ghcr.io/agenzia-tpl/rpsd-ingest
+    newTag: sha-abc1234
+  - name: ghcr.io/agenzia-tpl/rpsd-config
+    newTag: sha-abc1234
+  - name: ghcr.io/agenzia-tpl/rpsd-config-db
+    newTag: sha-abc1234
+```
+
+### 5. Deploy
+
+```bash
+kubectl apply -k manifests/overlays/eks/
+```
+
+The EKS overlay applies `gp3` StorageClass to all PVCs and inherits all base resources. If you created the namespace and secret in step 3, `kubectl apply` will skip re-creating them.
+
+### 6. Verify
+
+```bash
+kubectl get pods -n rpsd -w      # wait for all 12 Running
+kubectl get pvc  -n rpsd         # all should be Bound (EBS volumes provisioned)
+```
+
+### 7. Access services
+
+No Ingress is configured yet. Use port-forward to access services (all run as background jobs
+in a single terminal — paste at once, stop with `pkill kubectl`):
+
+```bash
+kubectl port-forward -n rpsd svc/kafka-ui        19010:8080  &
+kubectl port-forward -n rpsd svc/schema-registry  19020:8081  &
+kubectl port-forward -n rpsd svc/rabbitmq         19110:15672 &
+kubectl port-forward -n rpsd svc/prefect          19200:4200  &
+kubectl port-forward -n rpsd svc/keycloak         19300:8080  &
+kubectl port-forward -n rpsd svc/config-db        20140:5432  &
+kubectl port-forward -n rpsd svc/rpsd-ingest      20000:8000  &
+kubectl port-forward -n rpsd svc/rpsd-config      20100:8000  &
+```
+
+> **Keycloak hostname:** the base manifest sets `KC_HOSTNAME=http://localhost:19300`. This works
+> for port-forward access. Once you have an Ingress or load balancer URL, patch `KC_HOSTNAME`
+> in the EKS overlay.
+
+### 8. Update a service
+
+Update the tag in `manifests/overlays/eks/kustomization.yaml` and re-apply:
+
+```bash
+kubectl apply -k manifests/overlays/eks/
+```
+
+Kubernetes performs a rolling update with zero downtime.
+
+### 9. Teardown
+
+```bash
+# Remove all K8s resources (EBS volumes are retained by default)
+kubectl delete -k manifests/overlays/eks/
+
+# Also delete persistent volumes (and their EBS backing)
+kubectl delete pvc -n rpsd --all
+
+# Delete the EKS cluster (terminates EC2 nodes)
+eksctl delete cluster --name rpsd --region eu-south-1
+```
+
+---
+
 ## Keycloak Realm Import
 
 The Keycloak realm JSON must be exported and committed before deploying to Swarm.

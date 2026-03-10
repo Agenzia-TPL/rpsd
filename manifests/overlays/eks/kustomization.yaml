@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  # Uncomment when Ingress is configured:
+  # - ingress.yaml
+
+patches:
+  - path: patches/storage-class.yaml
+
+# Override image tags for production. Example:
+# images:
+#   - name: ghcr.io/agenzia-tpl/rpsd-ingest
+#     newTag: sha-abc1234
+#   - name: ghcr.io/agenzia-tpl/rpsd-config
+#     newTag: sha-abc1234
+#   - name: ghcr.io/agenzia-tpl/rpsd-config-db
+#     newTag: sha-abc1234

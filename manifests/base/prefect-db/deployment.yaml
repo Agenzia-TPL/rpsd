@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prefect-db
+  labels:
+    app.kubernetes.io/name: prefect-db
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: rpsd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prefect-db
+      app.kubernetes.io/part-of: rpsd
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prefect-db
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: rpsd
+    spec:
+      containers:
+        - name: prefect-db
+          image: postgres:17
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: prefect
+            - name: POSTGRES_DB
+              value: prefect
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rpsd-secrets
+                  key: rpsd-prefect-db-pass
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "prefect"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "prefect"]
+            initialDelaySeconds: 30
+            periodSeconds: 20
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: rpsd-prefect-db-data
