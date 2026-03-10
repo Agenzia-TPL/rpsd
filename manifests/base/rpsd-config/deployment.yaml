@@ -26,18 +26,23 @@ spec:
       containers:
         - name: rpsd-config
           image: ghcr.io/agenzia-tpl/rpsd-config:latest
-          command: ["uv", "run", "server"]
+          args: ["uv", "run", "gunicorn", "rpsd_config.server.asgi:application", "-c", "gunicorn.conf.py"]
           ports:
             - containerPort: 8000
               name: http
           env:
-            - name: DATABASE_HOST
+            - name: DATABASES__default__HOST
               value: config-db
-            - name: DATABASE_PORT
+            - name: DATABASES__default__PORT
               value: "5432"
-            - name: DATABASE_NAME
+            - name: DATABASES__default__NAME
               value: rpsd
-            - name: DATABASE_USER
+            - name: DATABASES__default__USER
               value: rpsd
-            - name: KEYCLOAK_URL
-              value: http://keycloak:8080
+            - name: DATABASES__default__PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rpsd-secrets
+                  key: rpsd-config-db-pass
+            - name: KEYCLOAK_DISCOVERY_URL
+              value: http://keycloak:8080/realms/rapsodia/.well-known/openid-configuration
