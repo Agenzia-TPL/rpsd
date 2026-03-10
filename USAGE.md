@@ -331,9 +331,15 @@ kubectl get httproutes -n rpsd
 
 ### 6. Access services
 
-Services are exposed via the Gateway API using hostname-based routing. Modern browsers
-resolve `*.localhost` to `127.0.0.1` natively (RFC 6761), so no `/etc/hosts` editing
-or external DNS services are needed.
+Services are exposed via the Gateway API using hostname-based routing.
+
+> **Browser requirement:** `*.localhost` subdomain resolution depends on the OS and browser.
+> - **macOS / Windows:** use a **Chromium-based browser** (Chrome, Edge, Brave, Arc, Opera).
+>   Their built-in DNS resolver implements RFC 6761 and routes `*.localhost` to `127.0.0.1`
+>   without OS-level configuration. Safari and Firefox rely on the system resolver, which
+>   does not resolve `*.localhost` subdomains, and will not work.
+> - **Linux:** all browsers work. Modern distros (Ubuntu 18+, Fedora, Arch…) use
+>   systemd-resolved, which implements RFC 6761 at the OS level.
 
 **Start the tunnel** (exposes the Gateway's LoadBalancer on localhost):
 
