@@ -3,4 +3,4 @@ kind: GatewayClass
 metadata:
   name: rpsd
 spec:
-  controllerName: gateway.envoyproxy.io/gateway-controller
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller

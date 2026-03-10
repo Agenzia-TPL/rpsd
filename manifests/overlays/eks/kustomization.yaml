@@ -9,6 +9,16 @@ patches:
   # Gateway API: hostname-based routing
   - path: patches/httproutes-hostnames.yaml
   - path: patches/keycloak-hostname.yaml
+  # GatewayClass is cluster-scoped but Kustomize namespaces it (CRD, not in OpenAPI schema).
+  # Strip the namespace so the Envoy Gateway controller can find it.
+  - target:
+      group: gateway.networking.k8s.io
+      version: v1
+      kind: GatewayClass
+      name: rpsd
+    patch: |
+      - op: remove
+        path: /metadata/namespace
 
 # Override image tags for production. Example:
 # images:
