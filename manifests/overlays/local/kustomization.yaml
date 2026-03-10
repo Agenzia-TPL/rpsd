@@ -5,4 +5,8 @@ resources:
   - ../../base
 
 patches:
-  - path: patches/services-nodeport.yaml
+  # Gateway API: hostname-based routing via *.localhost
+  - path: patches/httproutes-hostnames.yaml
+  - path: patches/keycloak-hostname.yaml
+  # NodePort fallback (uncomment if not using Gateway API):
+  # - path: patches/services-nodeport.yaml

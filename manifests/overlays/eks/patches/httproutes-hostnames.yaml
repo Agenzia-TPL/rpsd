@@ -1,0 +1,51 @@
+# Override HTTPRoute hostnames for EKS.
+# Replace "rpsd.example.com" with your actual domain.
+# Configure DNS to point *.rpsd.example.com to the Gateway's external address.
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: rpsd-ingest-route
+spec:
+  hostnames:
+    - "ingest.rpsd.example.com"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: rpsd-config-route
+spec:
+  hostnames:
+    - "config.rpsd.example.com"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: keycloak-route
+spec:
+  hostnames:
+    - "keycloak.rpsd.example.com"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: prefect-route
+spec:
+  hostnames:
+    - "prefect.rpsd.example.com"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: kafka-ui-route
+spec:
+  hostnames:
+    - "kafka-ui.rpsd.example.com"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: rabbitmq-route
+spec:
+  hostnames:
+    - "rabbitmq.rpsd.example.com"

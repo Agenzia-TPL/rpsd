@@ -23,3 +23,5 @@ resources:
   # Application
   - rpsd-ingest/
   - rpsd-config/
+  # Gateway API
+  - gateway/

@@ -3,11 +3,12 @@ kind: Kustomization
 
 resources:
   - ../../base
-  # Uncomment when Ingress is configured:
-  # - ingress.yaml
 
 patches:
   - path: patches/storage-class.yaml
+  # Gateway API: hostname-based routing
+  - path: patches/httproutes-hostnames.yaml
+  - path: patches/keycloak-hostname.yaml
 
 # Override image tags for production. Example:
 # images:
