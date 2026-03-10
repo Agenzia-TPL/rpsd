@@ -3,6 +3,7 @@
 .env.base
 .env.local
 .env.compose.images
+stacks/.env
 
 # Mounted data
 mnt/

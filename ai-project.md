@@ -58,8 +58,13 @@ All architectural decisions are recorded in `DECISIONS.md`. That file is the aut
 <!-- Add next specifications / tasks below this line -->
 
 - Verify end-to-end: start shared services, build and run rpsd-ingest, confirm connectivity
-- Export and commit Keycloak realm JSON to `shared/keycloak/realm-import/`
+- Export and commit Keycloak realm JSON to `shared/keycloak/realm-import/` (then enable `rpsd_keycloak_realm` config in `stacks/rpsd-stack.yml`)
 - Remove `host-scripts/` from rpsd-commons once rpsd is verified
 - Remove shared service compose files from rpsd-config/.devcontainer/ once rpsd is verified
 - Add rpsd-flow to `repos.conf` and `compose/services.yml` when it has a production Dockerfile
-- CI/CD pipelines in `.github/workflows/`
+- Verify rpsd-config pytest configuration (`DJANGO_SETTINGS_MODULE` in pyproject.toml is a placeholder)
+- Add application service environment variable documentation to `env/rpsd-ingest/` and `env/rpsd-config/` for staging scenarios
+- Set up `GH_REPO_TOKEN` secret in rpsd-ingest repository (required for CI cross-repo checkout of rpsd-commons)
+- Test Swarm stack deployment end-to-end (single-node Swarm, then Portainer)
+- Kubernetes: Helm charts in `charts/` or Kustomize in `manifests/`
+- Kubernetes: FluxCD-compatible GitOps structure for integrators using GitLab + FluxCD
