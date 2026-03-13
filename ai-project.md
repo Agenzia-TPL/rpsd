@@ -66,5 +66,9 @@ All architectural decisions are recorded in `DECISIONS.md`. That file is the aut
 - Add application service environment variable documentation to `env/rpsd-ingest/` and `env/rpsd-config/` for staging scenarios
 - Set up `GH_REPO_TOKEN` secret in rpsd-ingest repository (required for CI cross-repo checkout of rpsd-commons)
 - Test Swarm stack deployment end-to-end (single-node Swarm, then Portainer)
-- Kubernetes: Helm charts in `charts/` or Kustomize in `manifests/`
+- Kubernetes: initial Kustomize manifests created in `manifests/` (base + local/eks overlays) — see `DECISIONS.md` § 27
+- Kubernetes: test deployment on minikube or Docker Desktop K8s, verify all 12 services start
+- Kubernetes: test deployment on AWS EKS
 - Kubernetes: FluxCD-compatible GitOps structure for integrators using GitLab + FluxCD
+- Kubernetes: add Ingress resource for EKS overlay
+- Kubernetes: integrate ExternalSecrets or SealedSecrets for EKS secret management

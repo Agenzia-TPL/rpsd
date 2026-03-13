@@ -1,0 +1,49 @@
+# Patch all PVCs to use the EKS gp3 StorageClass.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rpsd-kafka-data
+spec:
+  storageClassName: gp3
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rpsd-rabbitmq-data
+spec:
+  storageClassName: gp3
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rpsd-prefect-db-data
+spec:
+  storageClassName: gp3
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rpsd-prefect-redis-data
+spec:
+  storageClassName: gp3
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rpsd-keycloak-db-data
+spec:
+  storageClassName: gp3
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rpsd-keycloak-data
+spec:
+  storageClassName: gp3
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rpsd-config-db-data
+spec:
+  storageClassName: gp3

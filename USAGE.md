@@ -272,6 +272,287 @@ If images are tagged with `latest`, enable **Re-pull image** to force a pull.
 
 ---
 
+## Kubernetes — Local (minikube / Docker Desktop)
+
+### Prerequisites
+
+- `kubectl`
+- [minikube](https://minikube.sigs.k8s.io/) **or** Docker Desktop with Kubernetes enabled
+- [Helm](https://helm.sh/) (for installing Envoy Gateway)
+
+### 1. Start the cluster
+
+**minikube:**
+```bash
+minikube start --memory=8192 --cpus=4
+```
+
+**Docker Desktop:** go to Settings → Kubernetes → Enable Kubernetes, then Apply & Restart.
+
+### 2. (Optional) Customise secrets
+
+The base manifests ship with dev-friendly default passwords. For local testing these are fine. To use custom passwords, edit `manifests/base/secrets.yaml` before deploying.
+
+### 3. Install Gateway API and Envoy Gateway
+
+The Gateway API CRDs are not bundled with Kubernetes and must be installed separately.
+[Envoy Gateway](https://gateway.envoyproxy.io/) is the controller that implements them.
+
+```bash
+# Install Gateway API CRDs
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+
+# Install Envoy Gateway
+helm install eg oci://docker.io/envoyproxy/gateway-helm \
+  --version v1.3.0 -n envoy-gateway-system --create-namespace
+```
+
+### 4. Deploy
+
+Run from the repo root:
+
+```bash
+kubectl apply -k manifests/overlays/local/
+```
+
+### 5. Verify
+
+```bash
+# Watch pods start up (all 12 should reach Running)
+kubectl get pods -n rpsd -w
+
+# Verify persistent volumes are bound
+kubectl get pvc -n rpsd
+
+# Verify Gateway and routes
+kubectl get gateway -n rpsd
+kubectl get httproutes -n rpsd
+```
+
+### 6. Access services
+
+Services are exposed via the Gateway API using hostname-based routing.
+
+> **Browser requirement:** `*.localhost` subdomain resolution depends on the OS and browser.
+> - **macOS / Windows:** use a **Chromium-based browser** (Chrome, Edge, Brave, Arc, Opera).
+>   Their built-in DNS resolver implements RFC 6761 and routes `*.localhost` to `127.0.0.1`
+>   without OS-level configuration. Safari and Firefox rely on the system resolver, which
+>   does not resolve `*.localhost` subdomains, and will not work.
+> - **Linux:** all browsers work. Modern distros (Ubuntu 18+, Fedora, Arch…) use
+>   systemd-resolved, which implements RFC 6761 at the OS level.
+
+**Start the tunnel** (exposes the Gateway's LoadBalancer on localhost):
+
+```bash
+# minikube:
+minikube tunnel          # run in a separate terminal, keep it open
+
+# Docker Desktop:
+# LoadBalancer services are exposed on localhost automatically — no tunnel needed.
+```
+
+**Service URLs:**
+
+| Service | URL |
+|---------|-----|
+| rpsd-ingest | http://ingest.localhost:19999 |
+| rpsd-config | http://config.localhost:19999 |
+| Keycloak | http://keycloak.localhost:19999 |
+| Prefect | http://prefect.localhost:19999 |
+| Kafka UI | http://kafka-ui.localhost:19999 |
+| RabbitMQ Mgmt | http://rabbitmq.localhost:19999 |
+
+**Fallback — port-forward** (if not using the Gateway):
+
+```bash
+kubectl port-forward -n rpsd svc/kafka-ui        19010:8080  &
+kubectl port-forward -n rpsd svc/schema-registry 19020:8081  &
+kubectl port-forward -n rpsd svc/rabbitmq        19110:15672 &
+kubectl port-forward -n rpsd svc/prefect         19200:4200  &
+kubectl port-forward -n rpsd svc/keycloak        19300:8080  &
+kubectl port-forward -n rpsd svc/config-db       20140:5432  &
+kubectl port-forward -n rpsd svc/rpsd-ingest     20000:8000  &
+kubectl port-forward -n rpsd svc/rpsd-config     20100:8000  &
+```
+
+### 7. Update a service
+
+```bash
+kubectl set image -n rpsd deployment/rpsd-ingest \
+  rpsd-ingest=ghcr.io/agenzia-tpl/rpsd-ingest:sha-abc1234
+```
+
+### 8. Teardown
+
+```bash
+# Remove all resources (keeps PVCs and their data)
+kubectl delete -k manifests/overlays/local/
+
+# Also delete persistent data
+kubectl delete pvc -n rpsd --all
+```
+
+---
+
+## Kubernetes — AWS EKS
+
+### Prerequisites
+
+- `kubectl`
+- AWS CLI configured (`aws configure`)
+- [`eksctl`](https://eksctl.io/) (for cluster creation — optional, can use AWS Console instead)
+- [Helm](https://helm.sh/) (for installing Envoy Gateway)
+
+### 1. Create an EKS cluster
+
+```bash
+eksctl create cluster \
+  --name rpsd \
+  --region eu-south-1 \
+  --node-type t3.xlarge \
+  --nodes 2
+```
+
+This takes ~15 minutes. `eksctl` automatically updates your kubeconfig.
+
+### 2. Verify kubectl context
+
+```bash
+kubectl config current-context   # should show something like: <email>@rpsd.eu-south-1.eksctl.io
+kubectl get nodes                # should list your worker nodes
+```
+
+### 3. Create secrets
+
+The base manifests include weak development defaults. **Do not use them in production.** Create the secret with real passwords before deploying:
+
+```bash
+kubectl create namespace rpsd
+
+kubectl create secret generic rpsd-secrets -n rpsd \
+  --from-literal=rpsd-keycloak-db-pass='<strong-password>' \
+  --from-literal=rpsd-keycloak-admin-pass='<strong-password>' \
+  --from-literal=rpsd-config-db-pass='<strong-password>' \
+  --from-literal=rpsd-prefect-db-pass='<strong-password>' \
+  --from-literal=rpsd-rabbitmq-pass='<strong-password>'
+```
+
+Use `openssl rand -base64 24` to generate each password.
+
+> **Production secret management:** for a more robust setup, use [AWS Secrets Manager](https://aws.amazon.com/secrets-manager/) together with the [External Secrets Operator](https://external-secrets.io/) to inject secrets into the cluster automatically.
+
+### 4. Install Gateway API and Envoy Gateway
+
+```bash
+# Install Gateway API CRDs
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+
+# Install Envoy Gateway
+helm install eg oci://docker.io/envoyproxy/gateway-helm \
+  --version v1.3.0 -n envoy-gateway-system --create-namespace
+```
+
+### 5. Pin image tags
+
+Edit `manifests/overlays/eks/kustomization.yaml` and uncomment the `images:` block with the specific commit SHA tags to deploy:
+
+```yaml
+images:
+  - name: ghcr.io/agenzia-tpl/rpsd-ingest
+    newTag: sha-abc1234
+  - name: ghcr.io/agenzia-tpl/rpsd-config
+    newTag: sha-abc1234
+  - name: ghcr.io/agenzia-tpl/rpsd-config-db
+    newTag: sha-abc1234
+```
+
+### 6. Deploy
+
+```bash
+kubectl apply -k manifests/overlays/eks/
+```
+
+The EKS overlay applies `gp3` StorageClass to all PVCs and inherits all base resources. If you created the namespace and secret in step 3, `kubectl apply` will skip re-creating them.
+
+### 7. Verify
+
+```bash
+kubectl get pods -n rpsd -w      # wait for all 12 Running
+kubectl get pvc  -n rpsd         # all should be Bound (EBS volumes provisioned)
+kubectl get gateway -n rpsd      # should show rpsd-gateway with an external address
+kubectl get httproutes -n rpsd   # should list all 6 routes
+```
+
+### 8. Access services
+
+Services are exposed via the Gateway API using hostname-based routing. Envoy Gateway
+provisions a LoadBalancer that receives an external address from AWS.
+
+**Get the Gateway's external address:**
+
+```bash
+kubectl get gateway rpsd-gateway -n rpsd -o jsonpath='{.status.addresses[0].value}'
+```
+
+**Configure DNS** to point your service subdomains to the Gateway address. Update the
+placeholder hostnames in `manifests/overlays/eks/patches/httproutes-hostnames.yaml` and
+`manifests/overlays/eks/patches/keycloak-hostname.yaml` with your actual domain, then
+re-apply:
+
+```bash
+kubectl apply -k manifests/overlays/eks/
+```
+
+| Service | URL (placeholder) |
+|---------|-------------------|
+| rpsd-ingest | https://ingest.rpsd.example.com |
+| rpsd-config | https://config.rpsd.example.com |
+| Keycloak | https://keycloak.rpsd.example.com |
+| Prefect | https://prefect.rpsd.example.com |
+| Kafka UI | https://kafka-ui.rpsd.example.com |
+| RabbitMQ Mgmt | https://rabbitmq.rpsd.example.com |
+
+> **TLS:** for HTTPS, add a TLS listener to the Gateway and use
+> [cert-manager](https://cert-manager.io/) with Let's Encrypt for automatic certificates.
+
+**Fallback — port-forward** (useful before DNS is configured):
+
+```bash
+kubectl port-forward -n rpsd svc/kafka-ui        19010:8080  &
+kubectl port-forward -n rpsd svc/schema-registry  19020:8081  &
+kubectl port-forward -n rpsd svc/rabbitmq         19110:15672 &
+kubectl port-forward -n rpsd svc/prefect          19200:4200  &
+kubectl port-forward -n rpsd svc/keycloak         19300:8080  &
+kubectl port-forward -n rpsd svc/config-db        20140:5432  &
+kubectl port-forward -n rpsd svc/rpsd-ingest      20000:8000  &
+kubectl port-forward -n rpsd svc/rpsd-config      20100:8000  &
+```
+
+### 9. Update a service
+
+Update the tag in `manifests/overlays/eks/kustomization.yaml` and re-apply:
+
+```bash
+kubectl apply -k manifests/overlays/eks/
+```
+
+Kubernetes performs a rolling update with zero downtime.
+
+### 10. Teardown
+
+```bash
+# Remove all K8s resources (EBS volumes are retained by default)
+kubectl delete -k manifests/overlays/eks/
+
+# Also delete persistent volumes (and their EBS backing)
+kubectl delete pvc -n rpsd --all
+
+# Delete the EKS cluster (terminates EC2 nodes)
+eksctl delete cluster --name rpsd --region eu-south-1
+```
+
+---
+
 ## Keycloak Realm Import
 
 The Keycloak realm JSON must be exported and committed before deploying to Swarm.
