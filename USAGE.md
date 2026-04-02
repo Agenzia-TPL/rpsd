@@ -26,6 +26,10 @@ cd rpsd
 ./scripts/start-services.sh
 ./scripts/start-services.sh --except rpsd-config   # developing rpsd-config in a devcontainer
 
+# Images are built automatically on first run and rebuilt when source changes are detected.
+# Use --build to force a rebuild of all services:
+./scripts/start-services.sh --build
+
 # 5. Check status
 ./scripts/status.sh
 ```

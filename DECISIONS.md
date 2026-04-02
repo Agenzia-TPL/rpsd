@@ -272,21 +272,23 @@ rpsd/
 **Decision:** `rpsd` maintains an explicit list of managed repositories in `repos.conf`, rather than scanning the parent directory for `rpsd-*` siblings.
 
 ```
-# NAME            TYPE
+# NAME            TYPE      DEPS
 rpsd-commons      library
-rpsd-ingest       service
+rpsd-ingest       service   rpsd-commons
 rpsd-config       service
 ```
 
-Each line contains a repository name and a type:
+Each line contains a repository name, a type, and an optional comma-separated list of library dependencies:
 
 - **`service`** — a runnable application; gets a Docker Compose profile and is started by `start-services.sh`
 - **`library`** — a build dependency only; cloned by `clone-repos.sh` but has no compose profile
+- **`DEPS`** — library repos whose changes should trigger a rebuild of the service image (see § 29)
 
 **Rationale:**
 - The parent directory may contain unrelated `rpsd-*` repos (forks, experiments, archived services) that should not be touched
 - An explicit list makes the set of managed repos auditable and version-controlled
 - The type column keeps `start-services.sh` from trying to start libraries as services
+- The deps column enables smart rebuild detection without parsing compose files in shell
 
 ---
 
@@ -581,4 +583,58 @@ The Kustomize manifests are a Kubernetes translation of `stacks/rpsd-stack.yml`.
 | `deploy.replicas` | `spec.replicas` in Deployment |
 | `depends_on` | Init containers (`busybox nc -z`) |
 | `RPSD_IMAGE_*` env vars | Kustomize `images:` transformer in overlays |
+
+---
+
+## 28. Service Images Are Self-Contained
+
+**Decision:** Each service's production Dockerfile defines its own default startup command via `CMD`. Deployment configurations (Docker Compose, Docker Swarm, Kubernetes) do **not** specify the startup command unless they intentionally need to override the default (e.g. running a worker variant of the same image).
+
+**Example (rpsd-config Dockerfile):**
+
+```dockerfile
+ENTRYPOINT ["./entrypoint.sh"]
+CMD ["gunicorn", "rpsd_config.server.asgi:application", "-c", "gunicorn.conf.py"]
+```
+
+**Rationale:**
+- Eliminates coupling between `rpsd` and service repos: when a service changes how it starts, only its own Dockerfile needs updating — `rpsd` deployment configs remain untouched
+- Follows standard Docker convention: `docker run <image>` works without external knowledge
+- The `ENTRYPOINT` + `CMD` composition pattern allows the entrypoint script to run pre-flight setup (e.g. creating missing `.env` files) before executing the command
+- Since `ENV PATH` includes `.venv/bin`, executables installed by `uv` (like `gunicorn` or `server`) are directly available without the `uv run` prefix
+- Devcontainers are unaffected — they use separate Dockerfiles (`.devcontainer/Dockerfile`)
+
+**Multi-service repos (future):** When a repo produces multiple services from one image, the `CMD` serves as the default for the primary service. Secondary services override via `command:` (Compose/Swarm) or `args:` (Kubernetes). The override is intentional and explicit ("this is the worker variant"), not a required piece of internal knowledge.
+
+---
+
+## 29. Smart Rebuild Detection
+
+**Decision:** `start-services.sh` automatically detects which service images are stale and rebuilds only those, without requiring the `--build` flag.
+
+**Mechanism:**
+
+1. Each service Dockerfile includes a label that stores git commit hashes of its source repos:
+   ```dockerfile
+   ARG RPSD_BUILD_SOURCES="unknown"
+   LABEL rpsd.build.sources="${RPSD_BUILD_SOURCES}"
+   ```
+2. At build time, `start-services.sh` computes a composite label from the service repo's HEAD and its library dependencies' HEADs (declared in `repos.conf`), then passes it as a build arg
+3. Before starting, the script reads the label from the existing image and compares it with the current git state
+4. Only services with mismatched hashes (or missing images/labels) are rebuilt
+
+**Example label value:** `rpsd-ingest:a1b2c3d4e5f6,rpsd-commons:f6e5d4c3b2a1`
+
+**Edge cases:**
+- Image doesn't exist → treated as stale, triggers build
+- Image exists but has no label (pre-migration) → treated as stale, one-time rebuild adds the label
+- Service repo not cloned → warning printed, skip check, try existing image
+- Dirty working tree → ignored (hash tracks committed state only, appropriate for dependency services)
+- `--build` flag → force-rebuilds all active services with labels embedded for future detection
+
+**Rationale:**
+- Developers no longer need to remember `--build` after pulling changes to service repos
+- Only stale services are rebuilt, avoiding unnecessary build time
+- The `ARG` + `LABEL` is placed after all `COPY`/`RUN` instructions so that changing the hash does not invalidate Docker's layer cache for dependencies or source code
+- Library dependency tracking (via `repos.conf` DEPS column) ensures that changes to shared libraries like `rpsd-commons` correctly trigger rebuilds of dependent services
 

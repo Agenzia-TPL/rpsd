@@ -34,7 +34,7 @@ All architectural decisions are recorded in `DECISIONS.md`. That file is the aut
 - Per-service "all-in-one" examples go in `env/<service>/`
 
 ### Repository Manifest
-- `repos.conf` lists managed repos (name + type) — see `DECISIONS.md` § 15
+- `repos.conf` lists managed repos (name + type + optional deps) — see `DECISIONS.md` § 15
 - Git URLs are inferred from rpsd's own origin — see `DECISIONS.md` § 16
 
 ### Image Management
