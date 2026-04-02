@@ -81,7 +81,7 @@ if [ ${#PROFILES[@]} -eq 0 ]; then
 fi
 
 # -------------------------------------------------------------------------
-# Start services
+# Build services (smart rebuild or forced)
 # -------------------------------------------------------------------------
 
 PROFILE_FLAGS=""
@@ -92,7 +92,49 @@ done
 print_info "Starting profiles: ${PROFILES[*]}"
 
 cd "$RPSD_ROOT"
-docker compose $PROFILE_FLAGS up -d $BUILD_FLAG
+
+# Build a lookup from profile name to index in SERVICE_NAMES/SERVICE_DEPS
+build_service() {
+  local service="$1"
+  local deps="$2"
+  local label
+  label=$(compute_build_sources_label "$service" "$deps") || label="unknown"
+  print_info "Building $service ..."
+  docker compose $PROFILE_FLAGS build --build-arg "RPSD_BUILD_SOURCES=$label" "$service"
+}
+
+for p in "${PROFILES[@]}"; do
+  service="rpsd-$p"
+
+  # Find matching index in SERVICE_NAMES to get deps
+  deps=""
+  for i in "${!SERVICE_NAMES[@]}"; do
+    if [[ "${SERVICE_NAMES[$i]}" == "$service" ]]; then
+      deps="${SERVICE_DEPS[$i]}"
+      break
+    fi
+  done
+
+  if [[ -n "$BUILD_FLAG" ]]; then
+    # --build: force rebuild all active services
+    build_service "$service" "$deps"
+  else
+    # Smart rebuild: check if image is stale
+    image=$(resolve_service_image "$p")
+    reason=$(check_service_needs_build "$service" "$deps" "$image") && {
+      print_warn "$service needs rebuild ($reason)"
+      build_service "$service" "$deps"
+    } || {
+      print_success "$service image is up-to-date"
+    }
+  fi
+done
+
+# -------------------------------------------------------------------------
+# Start services
+# -------------------------------------------------------------------------
+
+docker compose $PROFILE_FLAGS up -d
 
 echo ""
 docker compose $PROFILE_FLAGS ps

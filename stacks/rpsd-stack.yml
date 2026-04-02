@@ -353,7 +353,6 @@ services:
     image: ${RPSD_IMAGE_INGEST:-ghcr.io/agenzia-tpl/rpsd-ingest:latest}
     ports:
       - "${RPSD_INGEST_PORT:-20000}:8000"
-    command: uv run server
     # Configuration is passed as environment variables.
     # Set all required RPSD_INGEST_* variables via Portainer env vars or deployment env.
     # See env/rpsd-ingest/.env.local-all-in-one.example for the full list.
@@ -377,7 +376,6 @@ services:
     image: ${RPSD_IMAGE_CONFIG:-ghcr.io/agenzia-tpl/rpsd-config:latest}
     ports:
       - "${RPSD_CONFIG_PORT:-20100}:8000"
-    command: uv run server
     # Configuration is passed as environment variables.
     # Set all required RPSD_CONFIG_* variables via Portainer env vars or deployment env.
     # See env/rpsd-config/.env.local-all-in-one.example for the full list.

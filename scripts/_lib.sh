@@ -32,23 +32,27 @@ print_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 parse_repos_conf() {
   REPO_NAMES=()
   REPO_TYPES=()
+  REPO_DEPS=()
   while IFS= read -r line; do
     # Skip comments and blank lines
     [[ "$line" =~ ^[[:space:]]*# ]] && continue
     [[ -z "${line// /}" ]] && continue
-    read -r name type <<< "$line"
+    read -r name type deps <<< "$line"
     REPO_NAMES+=("$name")
     REPO_TYPES+=("$type")
+    REPO_DEPS+=("$deps")
   done < "$REPOS_CONF"
 }
 
-# Get only service-type repo names into SERVICE_NAMES[@].
+# Get only service-type repo names into SERVICE_NAMES[@] and SERVICE_DEPS[@].
 get_service_repos() {
   parse_repos_conf
   SERVICE_NAMES=()
+  SERVICE_DEPS=()
   for i in "${!REPO_NAMES[@]}"; do
     if [[ "${REPO_TYPES[$i]}" == "service" ]]; then
       SERVICE_NAMES+=("${REPO_NAMES[$i]}")
+      SERVICE_DEPS+=("${REPO_DEPS[$i]}")
     fi
   done
 }
@@ -107,6 +111,100 @@ require_docker() {
     print_error "Docker is installed but not running. Please start Docker."
     exit 1
   fi
+}
+
+# ---------------------------------------------------------------------------
+# Smart rebuild helpers
+# ---------------------------------------------------------------------------
+
+# Compute a build-sources label from git HEAD of the service and its deps.
+# Usage: compute_build_sources_label <service_name> [deps]
+# deps is a comma-separated list of library repo names.
+# Outputs: "service:hash" or "service:hash,dep1:hash,dep2:hash"
+# Returns 1 if a required repo directory is missing.
+compute_build_sources_label() {
+  local service="$1"
+  local deps="$2"
+  local label=""
+
+  local repo_dir="$PARENT_DIR/$service"
+  if [[ ! -d "$repo_dir/.git" ]]; then
+    return 1
+  fi
+  local hash
+  hash=$(git -C "$repo_dir" rev-parse --short=12 HEAD)
+  label="${service}:${hash}"
+
+  if [[ -n "$deps" ]]; then
+    IFS=',' read -ra dep_list <<< "$deps"
+    for dep in "${dep_list[@]}"; do
+      local dep_dir="$PARENT_DIR/$dep"
+      if [[ ! -d "$dep_dir/.git" ]]; then
+        return 1
+      fi
+      local dep_hash
+      dep_hash=$(git -C "$dep_dir" rev-parse --short=12 HEAD)
+      label="${label},${dep}:${dep_hash}"
+    done
+  fi
+
+  echo "$label"
+}
+
+# Read the rpsd.build.sources label from a Docker image.
+# Usage: get_image_build_label <image_name>
+# Outputs the label value, or empty string if not found.
+get_image_build_label() {
+  local image="$1"
+  local label
+  label=$(docker inspect --format='{{index .Config.Labels "rpsd.build.sources"}}' "$image" 2>/dev/null) || true
+  # docker inspect returns "<no value>" when label doesn't exist
+  if [[ "$label" == "<no value>" ]]; then
+    label=""
+  fi
+  echo "$label"
+}
+
+# Check if a service image needs rebuilding.
+# Usage: check_service_needs_build <service_name> <deps> <image_ref>
+# Returns 0 if build is needed (with reason on stdout), 1 if up-to-date.
+check_service_needs_build() {
+  local service="$1"
+  local deps="$2"
+  local image="$3"
+
+  local current_label
+  current_label=$(compute_build_sources_label "$service" "$deps") || {
+    echo "repo-missing"
+    return 0
+  }
+
+  local image_label
+  image_label=$(get_image_build_label "$image")
+
+  if [[ -z "$image_label" ]]; then
+    echo "no-image-or-label"
+    return 0
+  fi
+
+  if [[ "$current_label" != "$image_label" ]]; then
+    echo "sources-changed"
+    return 0
+  fi
+
+  return 1
+}
+
+# Resolve the Docker image reference for a service profile.
+# Usage: resolve_service_image <profile>
+# Example: resolve_service_image "config" → value of RPSD_IMAGE_CONFIG or "rpsd-config:local"
+resolve_service_image() {
+  local profile="$1"
+  local upper
+  upper=$(echo "$profile" | tr '[:lower:]' '[:upper:]')
+  local var_name="RPSD_IMAGE_${upper}"
+  local image="${!var_name:-rpsd-${profile}:local}"
+  echo "$image"
 }
 
 # Wait for a container to become healthy.

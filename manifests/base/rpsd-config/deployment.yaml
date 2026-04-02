@@ -26,7 +26,6 @@ spec:
       containers:
         - name: rpsd-config
           image: ghcr.io/agenzia-tpl/rpsd-config:latest
-          args: ["uv", "run", "gunicorn", "rpsd_config.server.asgi:application", "-c", "gunicorn.conf.py"]
           ports:
             - containerPort: 8000
               name: http

@@ -35,7 +35,6 @@ spec:
       containers:
         - name: rpsd-ingest
           image: ghcr.io/agenzia-tpl/rpsd-ingest:latest
-          args: ["uv", "run", "server"]
           ports:
             - containerPort: 8000
               name: http
