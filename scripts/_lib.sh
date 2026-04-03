@@ -97,6 +97,53 @@ build_clone_url() {
 }
 
 # ---------------------------------------------------------------------------
+# Environment file helpers
+# ---------------------------------------------------------------------------
+
+# Portable sed -i wrapper (macOS uses sed -i '', Linux uses sed -i).
+sed_inplace() {
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' "$@"
+  else
+    sed -i "$@"
+  fi
+}
+
+# Merge override env vars into a target .env file.
+# For each KEY=VALUE in the override file:
+#   - If KEY=... exists uncommented in target: replace the line
+#   - If # KEY=... exists commented in target: uncomment and replace
+#   - Otherwise: append to the end
+# Comments and blank lines in the override file are skipped.
+merge_env_overrides() {
+  local target="$1"
+  local override="$2"
+
+  while IFS= read -r line; do
+    # Skip comments and blank lines
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line// /}" ]] && continue
+
+    local key="${line%%=*}"
+
+    if grep -q "^${key}=" "$target" 2>/dev/null; then
+      # Replace existing uncommented line
+      local escaped
+      escaped=$(printf '%s\n' "$line" | sed 's/[&/\]/\\&/g')
+      sed_inplace "s|^${key}=.*|${escaped}|" "$target"
+    elif grep -q "^# *${key}=" "$target" 2>/dev/null; then
+      # Uncomment and replace
+      local escaped
+      escaped=$(printf '%s\n' "$line" | sed 's/[&/\]/\\&/g')
+      sed_inplace "s|^# *${key}=.*|${escaped}|" "$target"
+    else
+      # Append
+      echo "$line" >> "$target"
+    fi
+  done < "$override"
+}
+
+# ---------------------------------------------------------------------------
 # Docker helpers
 # ---------------------------------------------------------------------------
 

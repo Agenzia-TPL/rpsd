@@ -29,15 +29,15 @@ spec:
           ports:
             - containerPort: 8000
               name: http
+          envFrom:
+            - configMapRef:
+                name: rpsd-config-env
           env:
+            # Coordination overrides (take precedence over envFrom)
             - name: DATABASES__default__HOST
               value: config-db
             - name: DATABASES__default__PORT
               value: "5432"
-            - name: DATABASES__default__NAME
-              value: rpsd
-            - name: DATABASES__default__USER
-              value: rpsd
             - name: DATABASES__default__PASSWORD
               valueFrom:
                 secretKeyRef:

@@ -3,3 +3,7 @@ kind: Kustomization
 resources:
   - deployment.yaml
   - service.yaml
+configMapGenerator:
+  - name: rpsd-ingest-env
+    envs:
+      - ../../../../rpsd-ingest/.env.production

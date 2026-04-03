@@ -28,10 +28,13 @@ All architectural decisions are recorded in `DECISIONS.md`. That file is the aut
 - Host port defaults follow the `19xxx`/`20xxx` schema — see `DECISIONS.md` § 20; never use standard ports as defaults
 
 ### Environment Files
-- Follow the `.env.XXX.example` → `.env.base` → `.env` pattern from `DECISIONS.md` § 9
-- Env files are volume-mounted, not injected via `env_file:`
+- Each service repo owns `.env.development` and `.env.production` — see `DECISIONS.md` § 9
+- rpsd keeps only coordination overrides in `env/scenarios/<scenario>/<service>.env`
+- `setup.sh` merges `.env.development` + scenario overrides → `.env`
+- For Compose: `.env` is volume-mounted into containers
+- For Swarm: `env_file:` references `.env.production`, `environment:` overrides coordination vars
+- For K8s: `configMapGenerator` from `.env.production`, `env:` overrides coordination vars
 - Shared service overrides go in `shared/<service>/.env.example`
-- Per-service "all-in-one" examples go in `env/<service>/`
 
 ### Repository Manifest
 - `repos.conf` lists managed repos (name + type + optional deps) — see `DECISIONS.md` § 15
@@ -63,7 +66,7 @@ All architectural decisions are recorded in `DECISIONS.md`. That file is the aut
 - Remove shared service compose files from rpsd-config/.devcontainer/ once rpsd is verified
 - Add rpsd-flow to `repos.conf` and `compose/services.yml` when it has a production Dockerfile
 - Verify rpsd-config pytest configuration (`DJANGO_SETTINGS_MODULE` in pyproject.toml is a placeholder)
-- Add application service environment variable documentation to `env/rpsd-ingest/` and `env/rpsd-config/` for staging scenarios
+- Add staging scenario overrides to `env/scenarios/` when staging environments are set up
 - Set up `GH_REPO_TOKEN` secret in rpsd-ingest repository (required for CI cross-repo checkout of rpsd-commons)
 - Test Swarm stack deployment end-to-end (single-node Swarm, then Portainer)
 - Kubernetes: initial Kustomize manifests created in `manifests/` (base + local/eks overlays) — see `DECISIONS.md` § 27

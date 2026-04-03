@@ -12,7 +12,6 @@ services:
     ports:
       - "${RPSD_INGEST_PORT:-20000}:8000"
     volumes:
-      - ../../rpsd-ingest/.env.base:/app/.env.base:ro
       - ../../rpsd-ingest/.env:/app/.env:ro
     depends_on:
       kafka:
@@ -35,7 +34,6 @@ services:
     ports:
       - "${RPSD_CONFIG_PORT:-20100}:8000"
     volumes:
-      - ../../rpsd-config/.env.base:/app/.env.base:ro
       - ../../rpsd-config/.env:/app/.env:ro
     depends_on:
       config-db:
