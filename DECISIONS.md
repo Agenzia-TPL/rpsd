@@ -136,66 +136,65 @@ The `.env.example` files under `shared/` document only the variables that develo
 
 ## 9. Environment File Strategy
 
-### Pattern (established across all service repos)
+### Principle: Service Owns Its Config, rpsd Only Patches Coordination
 
-- `.env.XXX.example` — committed to repo, documents variables for a specific deployment scenario
-- `.env.base` — **gitignored**, created at setup time by copying the appropriate `.env.XXX.example`
-- `.env` — **gitignored**, actual local overrides on top of `.env.base`
+Each service repo owns two committed env files with all its configuration defaults:
 
-Pydantic Settings reads `.env.base` and `.env` directly. Docker Compose does **not** inject them via `env_file:` or `environment:` for Python services (this would override Pydantic's precedence chain).
+- **`.env.development`** — complete config for local development (dev-friendly values, localhost addresses). Used by developers in isolation and as the base for rpsd's local Compose scenarios.
+- **`.env.production`** — complete config for production (prod-safe values, `DEBUG=false`). Used by Swarm (`env_file:`) and Kubernetes (`configMapGenerator`).
+
+rpsd does NOT duplicate service config. It maintains only small **coordination override** files (hostnames, ports — how services find each other) per deployment scenario.
+
+### Local Development (single .env)
+
+Services read a single `.env` file via Pydantic Settings. There is no `.env.base` layer.
+
+- **Isolated dev** (no rpsd): developer copies `.env.development` → `.env`
+- **rpsd-orchestrated dev**: `setup.sh` copies `.env.development` → `.env` and merges scenario-specific coordination overrides on top
 
 ### Volume Mounting (not Compose injection)
 
-Env files are **volume-mounted** into containers:
+The `.env` file is **volume-mounted** into containers:
 
 ```yaml
 volumes:
-  - ./.env.base:/app/.env.base:ro
-  - ./.env:/app/.env:ro
+  - ../../rpsd-config/.env:/app/.env:ro
 ```
 
 This allows values to be changed and picked up with a service restart, without rebuilding images.
 
-### Exception: Nginx (needs env vars for template substitution)
+### Per-Environment Mechanism
 
-```yaml
-env_file:
-  - path: ./.env.base
-    required: false
-  - path: ./.env
-    required: false
-```
+| Context | Service-internal config | Coordination overrides |
+|---|---|---|
+| Local dev (Compose) | `.env` (from `.env.development` + scenario overrides) | Merged into `.env` by `setup.sh` |
+| Docker Swarm | `env_file:` referencing `.env.production` | `environment:` block (takes precedence) |
+| Kubernetes | `configMapGenerator` from `.env.production` | `env:` entries (take precedence over `envFrom:`) |
+| CI/CD | Runner secrets/variables injected as env vars | Same |
 
-### Env Files Are a Developer Workstation Concern Only
+### Why This Works
 
-`.env` files **never leave developer workstations**. Every other context uses its own native secret mechanism:
-
-| Context | Mechanism |
-|---|---|
-| Local dev | `.env.base` + `.env` volume-mounted |
-| CI/CD | Runner secrets/variables injected as env vars |
-| Docker Swarm staging | Docker Secrets or env files on Swarm node |
-| Kubernetes | ConfigMaps + Kubernetes Secrets (optionally Vault) |
+When a service adds a new setting, the service team adds it to `.env.development` and `.env.production`. rpsd does not need to change. rpsd only changes when coordination topology changes (new shared service, port reassignment).
 
 ---
 
-## 10. `rpsd`-Level Env Files
+## 10. `rpsd`-Level Scenario Overrides
 
-**Decision:** `rpsd` maintains its own `.env.*.example` files per service, covering the "services running together" scenario, which differs from standalone devcontainer scenarios (e.g. `DATABASE_HOST=postgres` vs `DATABASE_HOST=localhost`).
+**Decision:** `rpsd` keeps small override files per scenario per service, containing ONLY coordination vars that differ from the service's `.env.development`.
 
 ```
 rpsd/
   env/
-    rpsd-ingest/
-      .env.local-all-in-one.example
-      .env.local-external-db.example
-      .env.staging.example
-    rpsd-config/
-      .env.local-all-in-one.example
-      .env.staging.example
+    scenarios/
+      local-all-in-one/
+        rpsd-ingest.env     # 3-5 lines: hostnames on rpsd-network
+        rpsd-config.env
+      local-devcontainer/
+        rpsd-ingest.env     # host.docker.internal addresses
+        rpsd-config.env
 ```
 
-The actual `.env` files are gitignored. A `setup.sh` script in `rpsd` assists developers in copying the right examples.
+`setup.sh` copies the service's `.env.development`, then merges the matching override file on top (replacing matching keys, uncommenting commented keys, appending new keys).
 
 ---
 
@@ -210,15 +209,16 @@ rpsd/
   env/
     .env.compose.images.open.example
     .env.compose.images.managed.example   ← documents what an integrator needs to provide
-    rpsd-ingest/
-      .env.local-all-in-one.example
-      .env.staging.example
-    rpsd-config/
-      .env.local-all-in-one.example
-      .env.staging.example
+    scenarios/
+      local-all-in-one/
+        rpsd-ingest.env
+        rpsd-config.env
+      local-devcontainer/
+        rpsd-ingest.env
+        rpsd-config.env
 ```
 
-**Open mode** (default): public images, public registry, works out of the box.  
+**Open mode** (default): public images, public registry, works out of the box.
 **Managed mode**: integrators provide their own `images.managed.env` externally, without forking `rpsd`.
 
 This keeps `rpsd` forkless for integrators — they extend through configuration, not by copying and modifying.

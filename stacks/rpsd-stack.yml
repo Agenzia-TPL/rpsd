@@ -353,13 +353,16 @@ services:
     image: ${RPSD_IMAGE_INGEST:-ghcr.io/agenzia-tpl/rpsd-ingest:latest}
     ports:
       - "${RPSD_INGEST_PORT:-20000}:8000"
-    # Configuration is passed as environment variables.
-    # Set all required RPSD_INGEST_* variables via Portainer env vars or deployment env.
-    # See env/rpsd-ingest/.env.local-all-in-one.example for the full list.
+    # Service-internal config comes from .env.production (owned by the service repo).
+    # Only coordination vars (hostnames, ports) are overridden here.
+    env_file:
+      - ../rpsd-ingest/.env.production
     environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: "5672"
+      # Coordination overrides (take precedence over env_file)
+      FORWARD__KAFKA__BOOTSTRAP_SERVERS: kafka:9092
+      FORWARD__RABBITMQ__URL: amqp://guest:guest@rabbitmq/
+      CONSUMER__KAFKA__BOOTSTRAP_SERVERS: kafka:9092
+      CONSUMER__RABBITMQ__URL: amqp://guest:guest@rabbitmq/
       PREFECT_API_URL: http://prefect:4200/api
     networks:
       - rpsd-network
@@ -376,15 +379,15 @@ services:
     image: ${RPSD_IMAGE_CONFIG:-ghcr.io/agenzia-tpl/rpsd-config:latest}
     ports:
       - "${RPSD_CONFIG_PORT:-20100}:8000"
-    # Configuration is passed as environment variables.
-    # Set all required RPSD_CONFIG_* variables via Portainer env vars or deployment env.
-    # See env/rpsd-config/.env.local-all-in-one.example for the full list.
+    # Service-internal config comes from .env.production (owned by the service repo).
+    # Only coordination vars (hostnames, ports) are overridden here.
+    env_file:
+      - ../rpsd-config/.env.production
     environment:
-      DATABASE_HOST: config-db
-      DATABASE_PORT: "5432"
-      DATABASE_NAME: ${RPSD_CONFIG_DB_NAME:-rpsd}
-      DATABASE_USER: ${RPSD_CONFIG_DB_USER:-rpsd}
-      KEYCLOAK_URL: http://keycloak:8080
+      # Coordination overrides (take precedence over env_file)
+      DATABASES__default__HOST: config-db
+      DATABASES__default__PORT: "5432"
+      KEYCLOAK_DISCOVERY_URL: http://keycloak:8080/realms/rapsodia/.well-known/openid-configuration
     networks:
       - rpsd-network
     deploy:

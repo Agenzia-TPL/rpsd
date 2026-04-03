@@ -49,7 +49,7 @@ rpsd/
 | Script | Purpose |
 |--------|---------|
 | `clone-repos.sh` | Clone all repos listed in `repos.conf` |
-| `setup.sh [--scenario name] [--service name] [--force]` | Copy env templates into sibling service repos |
+| `setup.sh [--scenario name] [--service name] [--force]` | Generate `.env` in sibling service repos from their `.env.development` + scenario overrides |
 | `start-shared.sh [profiles...]` | Start shared infrastructure |
 | `stop-shared.sh [profiles...] [--clean]` | Stop shared infrastructure |
 | `start-services.sh [--except svc] [--build]` | Start application services |
@@ -120,13 +120,14 @@ All ports are overridable via `RPSD_*_PORT` variables in `.env`. See `DECISIONS.
 
 ## Environment Files
 
-The platform uses a layered environment file strategy:
+Each service repo owns its configuration via two committed files:
 
-- **`.env.XXX.example`** — committed templates for different scenarios
-- **`.env.base`** — gitignored, created by `setup.sh` from the appropriate example
-- **`.env`** — gitignored, local overrides
+- **`.env.development`** — complete defaults for local dev (localhost addresses, dev-friendly values)
+- **`.env.production`** — complete defaults for production (prod-safe values)
 
-See `DECISIONS.md` for the full architectural rationale.
+`rpsd` maintains only small **coordination override** files in `env/scenarios/` (hostnames, ports). `setup.sh` merges `.env.development` + scenario overrides → `.env`.
+
+See `DECISIONS.md` § 9 for the full architectural rationale.
 
 ## Image Management
 

@@ -16,14 +16,18 @@ FORCE=false
 usage() {
   echo "Usage: $0 [--scenario <name>] [--service <name>] [--force]"
   echo ""
-  echo "Copies env example files from rpsd into sibling service repositories."
+  echo "Generates .env files in sibling service repositories."
+  echo ""
+  echo "Each service repo provides its own .env.development with standalone defaults."
+  echo "This script copies it to .env and applies scenario-specific coordination"
+  echo "overrides (hostnames, ports) from env/scenarios/<scenario>/."
   echo ""
   echo "Options:"
-  echo "  --scenario <name>    Which env template to use (default: local-all-in-one)"
+  echo "  --scenario <name>    Which coordination overrides to apply (default: local-all-in-one)"
   echo "                         local-all-in-one   all services run in Docker via rpsd"
   echo "                         local-devcontainer service runs in devcontainer, shared via rpsd"
   echo "  --service <name>     Only set up this service (e.g. rpsd-config or config)"
-  echo "  --force              Overwrite existing .env.base in the service repo"
+  echo "  --force              Overwrite existing .env in the service repo"
   echo "  --help               Show this help"
   echo ""
   echo "Typical workflows:"
@@ -82,7 +86,7 @@ else
 fi
 
 # -------------------------------------------------------------------------
-# Step 2: Copy env examples to sibling service repos
+# Step 2: Generate .env in sibling service repos
 # -------------------------------------------------------------------------
 
 get_service_repos
@@ -108,7 +112,7 @@ fi
 
 # Warn about the compatibility assumption when using devcontainer scenario
 if [ "$SCENARIO" = "local-devcontainer" ]; then
-  echo -e "${YELLOW}NOTE: The devcontainer env files assume rpsd manages all shared services."
+  echo -e "${YELLOW}NOTE: The devcontainer overrides assume rpsd manages all shared services."
   echo -e "      They will not work if the service repo spins up its own infrastructure${NC}"
   echo -e "${YELLOW}      (e.g. its own docker-compose for postgres, kafka, etc.).${NC}"
   echo ""
@@ -116,38 +120,54 @@ fi
 
 for name in "${SERVICE_NAMES[@]}"; do
   repo_dir="$PARENT_DIR/$name"
-  example_dir="$RPSD_ROOT/env/$name"
-  local_example="$example_dir/.env.${SCENARIO}.example"
-  target="$repo_dir/.env.base"
+  dev_env="$repo_dir/.env.development"
+  override="$RPSD_ROOT/env/scenarios/$SCENARIO/$name.env"
+  target="$repo_dir/.env"
 
+  # Check service repo exists
   if [ ! -d "$repo_dir" ]; then
     print_warn "$name: repo not found at $repo_dir — run clone-repos.sh first"
     continue
   fi
 
-  if [ ! -f "$local_example" ]; then
-    print_warn "$name: no $SCENARIO template found at $local_example — skipping"
+  # Check .env.development exists in service repo
+  if [ ! -f "$dev_env" ]; then
+    print_warn "$name: no .env.development found — pull latest or create it"
     continue
   fi
 
+  # Handle existing .env
   if [ -f "$target" ]; then
     if [ "$FORCE" = true ]; then
-      print_info "$name: overwriting $target with $SCENARIO template"
-      cp "$local_example" "$target"
-      print_success "$name: .env.base updated"
+      print_info "$name: overwriting .env with $SCENARIO configuration"
     else
-      print_warn "$name: .env.base already exists — skipping (use --force to overwrite)"
+      # Generate what the .env would be, diff against existing
+      tmpfile=$(mktemp)
+      cp "$dev_env" "$tmpfile"
+      if [ -f "$override" ]; then
+        merge_env_overrides "$tmpfile" "$override"
+      fi
+
+      if diff -q "$target" "$tmpfile" > /dev/null 2>&1; then
+        print_success "$name: .env already up to date"
+      else
+        print_warn "$name: .env already exists and differs from what setup would generate"
+        echo "       Run with --force to overwrite, or diff manually:"
+        echo "         diff $target <(scripts/setup.sh --service $name --force --dry-run)"
+        diff --color=auto "$target" "$tmpfile" 2>/dev/null || true
+      fi
+      rm -f "$tmpfile"
+      continue
     fi
-  else
-    print_info "$name: copying $SCENARIO template → $target"
-    cp "$local_example" "$target"
-    print_success "$name: .env.base created"
   fi
 
-  # Create empty .env in service repo if not present
-  if [ ! -f "$repo_dir/.env" ]; then
-    touch "$repo_dir/.env"
-    print_success "$name: created empty .env"
+  # Generate .env: copy .env.development, then apply scenario overrides
+  cp "$dev_env" "$target"
+  if [ -f "$override" ]; then
+    merge_env_overrides "$target" "$override"
+    print_success "$name: .env created ($SCENARIO overrides applied)"
+  else
+    print_success "$name: .env created (no scenario overrides for $SCENARIO)"
   fi
 done
 
@@ -160,13 +180,12 @@ if [ "$SCENARIO" = "local-devcontainer" ]; then
   echo "    scripts/setup.sh                        (sets all-in-one env for remaining services)"
   echo ""
   echo "  Then:"
-  echo "  1. Review .env.base in the service repo — adjust CSRF/allowed-hosts to match"
-  echo "     your devcontainer's forwarded port if needed"
+  echo "  1. Review .env in the service repo — adjust if needed"
   echo "  2. scripts/start-shared.sh                        (start shared infrastructure)"
   echo "  3. scripts/start-services.sh --except <service>   (start OTHER services in Docker)"
   echo "  4. Open the service in its devcontainer and start it there"
 else
-  echo "  1. Review and adjust service .env.base files if needed"
+  echo "  1. Review and adjust service .env files if needed"
   echo "  2. scripts/start-shared.sh    (start shared infrastructure)"
   echo "  3. scripts/start-services.sh  (start application services)"
 fi
