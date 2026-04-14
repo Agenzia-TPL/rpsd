@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+# SPDX-License-Identifier: EUPL-1.2
 # Override HTTPRoute hostnames for EKS.
 # Replace "rpsd.example.com" with your actual domain.
 # Configure DNS to point *.rpsd.example.com to the Gateway's external address.

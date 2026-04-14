@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+# SPDX-License-Identifier: EUPL-1.2
 # HTTPRoute resources for all externally-accessible services.
 # Hostnames here are placeholders — each overlay patches them
 # with environment-specific values (*.localhost, *.rpsd.example.com, etc).

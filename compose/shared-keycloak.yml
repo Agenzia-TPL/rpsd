@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+# SPDX-License-Identifier: EUPL-1.2
 services:
   keycloak-db:
     image: ${RPSD_IMAGE_KEYCLOAK_DB:-postgres:17}

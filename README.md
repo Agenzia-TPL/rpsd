@@ -1,8 +1,18 @@
 # rpsd
 
-Main orchestration repository for the rpsd platform — a multi-service transit data processing system for Italian transport agencies.
+Main orchestration repository for the Rapsodia platform — a multi-service transit data processing system for Italian transport agencies.
 
-This repo provides Docker Compose orchestration, shared infrastructure configuration, developer scripts, and environment file management. Individual services live in sibling repositories (`rpsd-ingest`, `rpsd-config`, etc.).
+## Description
+
+Rapsodia is a software platform designed to collect, process and distribute public transport data for Italian transport agencies. The **rpsd** repository is the central orchestration layer that ties together the platform's individual services and shared infrastructure components.
+
+This repository contains no application code. Instead, it provides Docker Compose orchestration files, shared infrastructure configuration (Kafka, Keycloak, Prefect, PostgreSQL/PostGIS, RabbitMQ), developer workflow scripts, Kubernetes manifests, and environment file management. Individual application services live in sibling repositories (`rpsd-ingest`, `rpsd-config`, etc.) and are coordinated through this repo.
+
+The software is developed by Agenzia TPL and released as open source in compliance with Article 69 of the Italian Code of Digital Administration (CAD), following the [Developers Italia guidelines](https://developers.italia.it/) for public administration software reuse.
+
+## Project Status
+
+**Development** — The platform is under active development. Core orchestration, shared infrastructure, and the primary data ingestion service are functional. Kubernetes deployment manifests and some secondary services are in progress. See `DECISIONS.md` for the full architectural decision log.
 
 ## Prerequisites
 
@@ -134,3 +144,17 @@ See `DECISIONS.md` § 9 for the full architectural rationale.
 Image references use variables with public defaults (open mode). Integrators can provide their own image references without forking by overriding variables in `.env` (managed mode).
 
 See `env/.env.compose.images.open.example` and `env/.env.compose.images.managed.example`.
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
+
+## Maintainer
+
+This project is maintained by [Agenzia-TPL](https://github.com/Agenzia-TPL). For bug reports and feature requests, please use [GitHub Issues](https://github.com/Agenzia-TPL/rpsd/issues).
+
+## Copyright and Licence
+
+Copyright 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+
+Licensed under the European Union Public Licence (EUPL) v. 1.2. See the [LICENSE](LICENSE) file for the full licence text.

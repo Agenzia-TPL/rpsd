@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+# SPDX-License-Identifier: EUPL-1.2
 # Expose UI and API services via NodePort for local access.
 # NodePort range is 30000-32767. We use 30xxx to echo the rpsd port schema
 # (19xxx -> 30xxx offset, 20xxx -> 30xxx offset) as closely as possible.

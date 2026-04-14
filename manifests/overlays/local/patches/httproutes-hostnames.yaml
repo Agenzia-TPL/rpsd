@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+# SPDX-License-Identifier: EUPL-1.2
 # Override HTTPRoute hostnames for local development.
 # Modern browsers resolve *.localhost to 127.0.0.1 natively (RFC 6761),
 # so no /etc/hosts editing or external DNS services are needed.
