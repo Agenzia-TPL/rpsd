@@ -31,6 +31,8 @@ services:
       KEYCLOAK_ADMIN: ${RPSD_KEYCLOAK_ADMIN_USER:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${RPSD_KEYCLOAK_ADMIN_PASS:-admin}
       KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
       KC_HOSTNAME: http://localhost:${RPSD_KEYCLOAK_PORT:-19300}
       KC_HEALTH_ENABLED: "true"
     healthcheck:
