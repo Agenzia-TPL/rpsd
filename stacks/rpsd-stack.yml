@@ -1,0 +1,402 @@
+# SPDX-FileCopyrightText: 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+# SPDX-License-Identifier: EUPL-1.2
+# rpsd Docker Swarm Stack
+#
+# Deploy from the repo root:
+#   docker stack deploy -c stacks/rpsd-stack.yml rpsd
+#
+# Or point Portainer to this file in the rpsd Git repository.
+#
+# Prerequisites — create Docker Secrets before deploying:
+#   printf 'changeme' | docker secret create rpsd_keycloak_db_pass -
+#   printf 'changeme' | docker secret create rpsd_keycloak_admin_pass -
+#   printf 'changeme' | docker secret create rpsd_config_db_pass -
+#   printf 'changeme' | docker secret create rpsd_prefect_db_pass -
+#   printf 'changeme' | docker secret create rpsd_rabbitmq_pass -
+#
+# All RPSD_IMAGE_* variables default to ghcr.io (open mode).
+# For a private registry, override them via environment variables or a .env file.
+# See stacks/.env.example for the full list.
+#
+# Application service configuration (RPSD_INGEST_*, RPSD_CONFIG_*) must be set
+# as environment variables at deploy time — via Portainer's stack env vars or
+# by prepending them to the docker stack deploy command.
+
+networks:
+  rpsd-network:
+    driver: overlay
+    attachable: true
+
+volumes:
+  rpsd-kafka-data:
+    name: rpsd-kafka-data
+  rpsd-rabbitmq-data:
+    name: rpsd-rabbitmq-data
+  rpsd-prefect-db-data:
+    name: rpsd-prefect-db-data
+  rpsd-prefect-redis-data:
+    name: rpsd-prefect-redis-data
+  rpsd-keycloak-db-data:
+    name: rpsd-keycloak-db-data
+  rpsd-keycloak-data:
+    name: rpsd-keycloak-data
+  rpsd-config-db-data:
+    name: rpsd-config-db-data
+
+secrets:
+  rpsd_keycloak_db_pass:
+    external: true
+  rpsd_keycloak_admin_pass:
+    external: true
+  rpsd_config_db_pass:
+    external: true
+  rpsd_prefect_db_pass:
+    external: true
+  rpsd_rabbitmq_pass:
+    external: true
+
+configs:
+  rpsd_config_db_init_sql:
+    # Path is relative to the repo root where `docker stack deploy` is run.
+    file: shared/config-db/init.sql
+  # Uncomment and extend once realm JSON files exist in shared/keycloak/realm-import/
+  # rpsd_keycloak_realm:
+  #   file: shared/keycloak/realm-import/rpsd-realm.json
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Kafka (KRaft mode — no Zookeeper)
+  # ---------------------------------------------------------------------------
+
+  kafka:
+    image: ${RPSD_IMAGE_KAFKA:-apache/kafka:latest}
+    ports:
+      - "${RPSD_KAFKA_PORT:-19000}:9092"
+      - "${RPSD_KAFKA_KRAFT_PORT:-19001}:9093"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      CLUSTER_ID: rpsd-kafka-cluster-1
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - rpsd-kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/9092' || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - rpsd-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+
+  kafka-ui:
+    image: ${RPSD_IMAGE_KAFKA_UI:-provectuslabs/kafka-ui:latest}
+    ports:
+      - "${RPSD_KAFKA_UI_PORT:-19010}:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: rpsd
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      DYNAMIC_CONFIG_ENABLED: "true"
+    networks:
+      - rpsd-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+
+  schema-registry:
+    image: ${RPSD_IMAGE_SCHEMA_REGISTRY:-confluentinc/cp-schema-registry:latest}
+    ports:
+      - "${RPSD_SCHEMA_REGISTRY_PORT:-19020}:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    networks:
+      - rpsd-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+
+  # ---------------------------------------------------------------------------
+  # RabbitMQ
+  # ---------------------------------------------------------------------------
+
+  rabbitmq:
+    image: ${RPSD_IMAGE_RABBITMQ:-rabbitmq:3-management-alpine}
+    ports:
+      - "${RPSD_RABBITMQ_PORT:-19100}:5672"
+      - "${RPSD_RABBITMQ_MGMT_PORT:-19110}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RPSD_RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS_FILE: /run/secrets/rpsd_rabbitmq_pass
+    volumes:
+      - rpsd-rabbitmq-data:/var/lib/rabbitmq
+    secrets:
+      - rpsd_rabbitmq_pass
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - rpsd-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+
+  # ---------------------------------------------------------------------------
+  # Prefect
+  # ---------------------------------------------------------------------------
+
+  prefect-db:
+    image: ${RPSD_IMAGE_PREFECT_DB:-postgres:17}
+    environment:
+      POSTGRES_USER: ${RPSD_PREFECT_DB_USER:-prefect}
+      POSTGRES_DB: ${RPSD_PREFECT_DB_NAME:-prefect}
+      POSTGRES_PASSWORD_FILE: /run/secrets/rpsd_prefect_db_pass
+    volumes:
+      - rpsd-prefect-db-data:/var/lib/postgresql/data
+    secrets:
+      - rpsd_prefect_db_pass
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prefect"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rpsd-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+
+  prefect-redis:
+    image: ${RPSD_IMAGE_PREFECT_REDIS:-redis:8-alpine}
+    volumes:
+      - rpsd-prefect-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rpsd-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+
+  prefect:
+    image: ${RPSD_IMAGE_PREFECT:-prefecthq/prefect:3-latest}
+    command: prefect server start --host 0.0.0.0
+    ports:
+      - "${RPSD_PREFECT_PORT:-19200}:4200"
+    environment:
+      PREFECT_SERVER_API_HOST: 0.0.0.0
+      PREFECT_SERVER_API_PORT: 4200
+      # Set RPSD_PREFECT_DB_URL to: postgresql+asyncpg://prefect:PASSWORD@prefect-db:5432/prefect
+      PREFECT_API_DATABASE_CONNECTION_URL: ${RPSD_PREFECT_DB_URL}
+      # Set RPSD_PREFECT_API_URL to the external URL where the Prefect API is reachable,
+      # e.g. http://<swarm-host>:19200/api
+      PREFECT_API_URL: ${RPSD_PREFECT_API_URL}
+      PREFECT_MESSAGING_BROKER: "prefect_redis.messaging"
+      PREFECT_MESSAGING_CACHE: "prefect_redis.messaging"
+      PREFECT_REDIS_MESSAGING_HOST: "prefect-redis"
+      PREFECT_REDIS_MESSAGING_PORT: "6379"
+      PREFECT_REDIS_MESSAGING_DB: "0"
+      PREFECT_TASK_SCHEDULING_DEFAULT_STORAGE_BLOCK: "redis-storage"
+      PREFECT_RESULTS_PERSIST_BY_DEFAULT: "true"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    networks:
+      - rpsd-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+
+  # ---------------------------------------------------------------------------
+  # Keycloak
+  # ---------------------------------------------------------------------------
+
+  keycloak-db:
+    image: ${RPSD_IMAGE_KEYCLOAK_DB:-postgres:17}
+    environment:
+      POSTGRES_DB: ${RPSD_KEYCLOAK_DB_NAME:-keycloak}
+      POSTGRES_USER: ${RPSD_KEYCLOAK_DB_USER:-keycloak}
+      POSTGRES_PASSWORD_FILE: /run/secrets/rpsd_keycloak_db_pass
+    volumes:
+      - rpsd-keycloak-db-data:/var/lib/postgresql/data
+    secrets:
+      - rpsd_keycloak_db_pass
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rpsd-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+
+  keycloak:
+    image: ${RPSD_IMAGE_KEYCLOAK:-quay.io/keycloak/keycloak:26.3}
+    # Note: start-dev is for staging only. Use `start` for production.
+    # Remove --import-realm once the realm has been imported and persisted.
+    command: ["start-dev", "--import-realm"]
+    ports:
+      - "${RPSD_KEYCLOAK_PORT:-19300}:8080"
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-db
+      KC_DB_URL_DATABASE: ${RPSD_KEYCLOAK_DB_NAME:-keycloak}
+      KC_DB_USERNAME: ${RPSD_KEYCLOAK_DB_USER:-keycloak}
+      KC_DB_PASSWORD_FILE: /run/secrets/rpsd_keycloak_db_pass
+      KEYCLOAK_ADMIN: ${RPSD_KEYCLOAK_ADMIN_USER:-admin}
+      KEYCLOAK_ADMIN_PASSWORD_FILE: /run/secrets/rpsd_keycloak_admin_pass
+      KC_HTTP_ENABLED: "true"
+      # Set to the external URL where Keycloak is reachable, e.g. http://<swarm-host>:19300
+      KC_HOSTNAME: ${RPSD_KEYCLOAK_HOSTNAME}
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - rpsd-keycloak-data:/opt/keycloak/data
+      # Uncomment once realm JSON files exist in shared/keycloak/realm-import/:
+      # configs:
+      #   - source: rpsd_keycloak_realm
+      #     target: /opt/keycloak/data/import/rpsd-realm.json
+    secrets:
+      - rpsd_keycloak_db_pass
+      - rpsd_keycloak_admin_pass
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+    networks:
+      - rpsd-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+
+  # ---------------------------------------------------------------------------
+  # config-db (PostgreSQL + PostGIS)
+  # ---------------------------------------------------------------------------
+
+  config-db:
+    image: ${RPSD_IMAGE_CONFIG_DB:-ghcr.io/agenzia-tpl/rpsd-config-db:latest}
+    ports:
+      - "${RPSD_CONFIG_DB_PORT:-20140}:5432"
+    environment:
+      POSTGRES_DB: ${RPSD_CONFIG_DB_NAME:-rpsd}
+      POSTGRES_USER: ${RPSD_CONFIG_DB_USER:-rpsd}
+      POSTGRES_PASSWORD_FILE: /run/secrets/rpsd_config_db_pass
+    volumes:
+      - rpsd-config-db-data:/var/lib/postgresql/data
+    secrets:
+      - rpsd_config_db_pass
+    configs:
+      - source: rpsd_config_db_init_sql
+        target: /docker-entrypoint-initdb.d/01-postgis.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rpsd"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rpsd-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+
+  # ---------------------------------------------------------------------------
+  # Application services
+  # ---------------------------------------------------------------------------
+
+  rpsd-ingest:
+    image: ${RPSD_IMAGE_INGEST:-ghcr.io/agenzia-tpl/rpsd-ingest:latest}
+    ports:
+      - "${RPSD_INGEST_PORT:-20000}:8000"
+    # Service-internal config comes from .env.production (owned by the service repo).
+    # Only coordination vars (hostnames, ports) are overridden here.
+    env_file:
+      - ../rpsd-ingest/.env.production
+    environment:
+      # Coordination overrides (take precedence over env_file)
+      FORWARD__KAFKA__BOOTSTRAP_SERVERS: kafka:9092
+      FORWARD__RABBITMQ__URL: amqp://guest:guest@rabbitmq/
+      CONSUMER__KAFKA__BOOTSTRAP_SERVERS: kafka:9092
+      CONSUMER__RABBITMQ__URL: amqp://guest:guest@rabbitmq/
+      PREFECT_API_URL: http://prefect:4200/api
+    networks:
+      - rpsd-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+      update_config:
+        order: start-first
+        failure_action: rollback
+
+  rpsd-config:
+    image: ${RPSD_IMAGE_CONFIG:-ghcr.io/agenzia-tpl/rpsd-config:latest}
+    ports:
+      - "${RPSD_CONFIG_PORT:-20100}:8000"
+    # Service-internal config comes from .env.production (owned by the service repo).
+    # Only coordination vars (hostnames, ports) are overridden here.
+    env_file:
+      - ../rpsd-config/.env.production
+    environment:
+      # Coordination overrides (take precedence over env_file)
+      DATABASES__default__HOST: config-db
+      DATABASES__default__PORT: "5432"
+      KEYCLOAK_DISCOVERY_URL: http://keycloak:8080/realms/rapsodia/.well-known/openid-configuration
+    networks:
+      - rpsd-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+      update_config:
+        order: start-first
+        failure_action: rollback

@@ -1,0 +1,72 @@
+# SPDX-FileCopyrightText: 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+# SPDX-License-Identifier: EUPL-1.2
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prefect
+  labels:
+    app.kubernetes.io/name: prefect
+    app.kubernetes.io/component: orchestration
+    app.kubernetes.io/part-of: rpsd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prefect
+      app.kubernetes.io/part-of: rpsd
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prefect
+        app.kubernetes.io/component: orchestration
+        app.kubernetes.io/part-of: rpsd
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z prefect-db 5432; do echo waiting for prefect-db; sleep 2; done"]
+        - name: wait-for-redis
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z prefect-redis 6379; do echo waiting for prefect-redis; sleep 2; done"]
+      containers:
+        - name: prefect
+          image: prefecthq/prefect:3-latest
+          command: ["prefect", "server", "start", "--host", "0.0.0.0"]
+          ports:
+            - containerPort: 4200
+              name: http
+          env:
+            - name: PREFECT_SERVER_API_HOST
+              value: "0.0.0.0"
+            - name: PREFECT_SERVER_API_PORT
+              value: "4200"
+            - name: PREFECT_API_DATABASE_CONNECTION_URL
+              value: "postgresql+asyncpg://prefect:prefect@prefect-db:5432/prefect"
+            - name: PREFECT_API_URL
+              value: "http://prefect:4200/api"
+            - name: PREFECT_MESSAGING_BROKER
+              value: "prefect_redis.messaging"
+            - name: PREFECT_MESSAGING_CACHE
+              value: "prefect_redis.messaging"
+            - name: PREFECT_REDIS_MESSAGING_HOST
+              value: "prefect-redis"
+            - name: PREFECT_REDIS_MESSAGING_PORT
+              value: "6379"
+            - name: PREFECT_REDIS_MESSAGING_DB
+              value: "0"
+            - name: PREFECT_TASK_SCHEDULING_DEFAULT_STORAGE_BLOCK
+              value: "redis-storage"
+            - name: PREFECT_RESULTS_PERSIST_BY_DEFAULT
+              value: "true"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 4200
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 4200
+            initialDelaySeconds: 30
+            periodSeconds: 20

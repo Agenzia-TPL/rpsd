@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+# SPDX-License-Identifier: EUPL-1.2
+# Override KC_HOSTNAME for local Gateway API access.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+spec:
+  template:
+    spec:
+      containers:
+        - name: keycloak
+          env:
+            - name: KC_HOSTNAME
+              value: "http://keycloak.localhost:19999"

@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+# SPDX-License-Identifier: EUPL-1.2
+services:
+  rpsd-ingest:
+    build:
+      context: ../../rpsd-ingest
+      dockerfile: ./Dockerfile
+      additional_contexts:
+        rpsd-commons: ../../rpsd-commons
+    image: ${RPSD_IMAGE_INGEST:-rpsd-ingest:local}
+    container_name: rpsd-ingest
+    profiles: ["ingest", "services", "all"]
+    restart: unless-stopped
+    ports:
+      - "${RPSD_INGEST_PORT:-20000}:8000"
+    volumes:
+      - ../../rpsd-ingest/.env:/app/.env:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+        required: false
+      rabbitmq:
+        condition: service_healthy
+        required: false
+    networks:
+      - rpsd-network
+
+  rpsd-config:
+    build:
+      context: ../../rpsd-config
+      dockerfile: ./Dockerfile
+    image: ${RPSD_IMAGE_CONFIG:-rpsd-config:local}
+    container_name: rpsd-config
+    profiles: ["config", "services", "all"]
+    restart: unless-stopped
+    ports:
+      - "${RPSD_CONFIG_PORT:-20100}:8000"
+    volumes:
+      - ../../rpsd-config/.env:/app/.env:ro
+    depends_on:
+      config-db:
+        condition: service_healthy
+        required: false
+      keycloak:
+        condition: service_started
+        required: false
+    networks:
+      - rpsd-network

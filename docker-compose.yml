@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+# SPDX-License-Identifier: EUPL-1.2
+# rpsd — Main orchestration compose file
+#
+# Usage examples:
+#   Start shared infra:   ./scripts/start-shared.sh
+#   Start Kafka only:     ./scripts/start-shared.sh kafka
+#   Start all services:   ./scripts/start-services.sh
+#   Start except ingest:  ./scripts/start-services.sh --except ingest
+#   Start everything:     docker compose --profile all up -d
+#
+# See scripts/ for wrapper scripts that handle profiles automatically.
+
+include:
+  - compose/shared-kafka.yml
+  - compose/shared-rabbitmq.yml
+  - compose/shared-prefect.yml
+  - compose/shared-keycloak.yml
+  - compose/shared-config-db.yml
+  - compose/services.yml
+
+networks:
+  rpsd-network:
+    name: rpsd-network
+    driver: bridge

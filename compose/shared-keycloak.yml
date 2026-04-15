@@ -1,0 +1,64 @@
+# SPDX-FileCopyrightText: 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+# SPDX-License-Identifier: EUPL-1.2
+services:
+  keycloak-db:
+    image: ${RPSD_IMAGE_KEYCLOAK_DB:-postgres:17}
+    container_name: rpsd-keycloak-db
+    profiles: ["keycloak", "shared", "all"]
+    environment:
+      POSTGRES_DB: ${RPSD_KEYCLOAK_DB_NAME:-keycloak}
+      POSTGRES_USER: ${RPSD_KEYCLOAK_DB_USER:-keycloak}
+      POSTGRES_PASSWORD: ${RPSD_KEYCLOAK_DB_PASS:-keycloak}
+    volumes:
+      - rpsd-keycloak-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rpsd-network
+
+  keycloak:
+    image: ${RPSD_IMAGE_KEYCLOAK:-quay.io/keycloak/keycloak:26.3}
+    container_name: rpsd-keycloak
+    profiles: ["keycloak", "shared", "all"]
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-db
+      KC_DB_URL_DATABASE: ${RPSD_KEYCLOAK_DB_NAME:-keycloak}
+      KC_DB_USERNAME: ${RPSD_KEYCLOAK_DB_USER:-keycloak}
+      KC_DB_PASSWORD: ${RPSD_KEYCLOAK_DB_PASS:-keycloak}
+      KEYCLOAK_ADMIN: ${RPSD_KEYCLOAK_ADMIN_USER:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${RPSD_KEYCLOAK_ADMIN_PASS:-admin}
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HOSTNAME: http://localhost:${RPSD_KEYCLOAK_PORT:-19300}
+      KC_HEALTH_ENABLED: "true"
+    healthcheck:
+      # Health check runs INSIDE the keycloak container, so use localhost
+      # Management/health endpoints are always on port 9000
+      # Using bash TCP method since curl may not be available in Keycloak image
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    ports:
+      - "${RPSD_KEYCLOAK_PORT:-19300}:8080"
+    volumes:
+      - rpsd-keycloak-data:/opt/keycloak/data
+      - ../shared/keycloak/realm-import:/opt/keycloak/data/import:ro
+    networks:
+      - rpsd-network
+
+volumes:
+  rpsd-keycloak-db-data:
+    name: rpsd-keycloak-db-data
+  rpsd-keycloak-data:
+    name: rpsd-keycloak-data

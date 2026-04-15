@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+# SPDX-License-Identifier: EUPL-1.2
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: rpsd
+
+resources:
+  - namespace.yaml
+  - secrets.yaml
+  # Messaging
+  - kafka/
+  - kafka-ui/
+  - schema-registry/
+  - rabbitmq/
+  # Prefect
+  - prefect-db/
+  - prefect-redis/
+  - prefect/
+  # Keycloak
+  - keycloak-db/
+  - keycloak/
+  # Config DB
+  - config-db/
+  # Application
+  - rpsd-ingest/
+  - rpsd-config/
+  # Gateway API
+  - gateway/

@@ -1,0 +1,101 @@
+# SPDX-FileCopyrightText: 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+# SPDX-License-Identifier: EUPL-1.2
+# HTTPRoute resources for all externally-accessible services.
+# Hostnames here are placeholders — each overlay patches them
+# with environment-specific values (*.localhost, *.rpsd.example.com, etc).
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: rpsd-ingest-route
+  labels:
+    app.kubernetes.io/part-of: rpsd
+spec:
+  parentRefs:
+    - name: rpsd-gateway
+  hostnames:
+    - "ingest.rpsd.local"
+  rules:
+    - backendRefs:
+        - name: rpsd-ingest
+          port: 8000
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: rpsd-config-route
+  labels:
+    app.kubernetes.io/part-of: rpsd
+spec:
+  parentRefs:
+    - name: rpsd-gateway
+  hostnames:
+    - "config.rpsd.local"
+  rules:
+    - backendRefs:
+        - name: rpsd-config
+          port: 8000
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: keycloak-route
+  labels:
+    app.kubernetes.io/part-of: rpsd
+spec:
+  parentRefs:
+    - name: rpsd-gateway
+  hostnames:
+    - "keycloak.rpsd.local"
+  rules:
+    - backendRefs:
+        - name: keycloak
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: prefect-route
+  labels:
+    app.kubernetes.io/part-of: rpsd
+spec:
+  parentRefs:
+    - name: rpsd-gateway
+  hostnames:
+    - "prefect.rpsd.local"
+  rules:
+    - backendRefs:
+        - name: prefect
+          port: 4200
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: kafka-ui-route
+  labels:
+    app.kubernetes.io/part-of: rpsd
+spec:
+  parentRefs:
+    - name: rpsd-gateway
+  hostnames:
+    - "kafka-ui.rpsd.local"
+  rules:
+    - backendRefs:
+        - name: kafka-ui
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: rabbitmq-route
+  labels:
+    app.kubernetes.io/part-of: rpsd
+spec:
+  parentRefs:
+    - name: rpsd-gateway
+  hostnames:
+    - "rabbitmq.rpsd.local"
+  rules:
+    - backendRefs:
+        - name: rabbitmq
+          port: 15672

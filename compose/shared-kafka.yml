@@ -1,0 +1,76 @@
+# SPDX-FileCopyrightText: 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+# SPDX-License-Identifier: EUPL-1.2
+services:
+  kafka:
+    image: ${RPSD_IMAGE_KAFKA:-apache/kafka:latest}
+    container_name: rpsd-kafka
+    profiles: ["kafka", "messaging", "shared", "all"]
+    ports:
+      - "${RPSD_KAFKA_PORT:-19000}:9092"
+      - "${RPSD_KAFKA_KRAFT_PORT:-19001}:9093"
+    environment:
+      # KRaft settings (no Zookeeper needed)
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      # Listeners — advertise container hostname for intra-network access
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Cluster ID (required for KRaft)
+      CLUSTER_ID: rpsd-kafka-cluster-1
+      # Log settings
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      # Auto-create topics
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - rpsd-kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/9092' || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - rpsd-network
+
+  kafka-ui:
+    image: ${RPSD_IMAGE_KAFKA_UI:-provectuslabs/kafka-ui:latest}
+    container_name: rpsd-kafka-ui
+    profiles: ["kafka", "messaging", "shared", "all"]
+    ports:
+      - "${RPSD_KAFKA_UI_PORT:-19010}:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: rpsd-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      DYNAMIC_CONFIG_ENABLED: "true"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - rpsd-network
+
+  schema-registry:
+    image: ${RPSD_IMAGE_SCHEMA_REGISTRY:-confluentinc/cp-schema-registry:latest}
+    container_name: rpsd-schema-registry
+    profiles: ["kafka", "messaging", "shared", "all"]
+    ports:
+      - "${RPSD_SCHEMA_REGISTRY_PORT:-19020}:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - rpsd-network
+
+volumes:
+  rpsd-kafka-data:
+    name: rpsd-kafka-data

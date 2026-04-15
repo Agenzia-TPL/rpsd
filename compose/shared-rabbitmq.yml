@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 AGENZIA TPL BACINO CITTA' METROPOLITANA MILANO, MONZA E BRIANZA, LODI, PAVIA
+# SPDX-License-Identifier: EUPL-1.2
+services:
+  rabbitmq:
+    image: ${RPSD_IMAGE_RABBITMQ:-rabbitmq:3-management-alpine}
+    container_name: rpsd-rabbitmq
+    profiles: ["rabbitmq", "messaging", "shared", "all"]
+    ports:
+      - "${RPSD_RABBITMQ_PORT:-19100}:5672"
+      - "${RPSD_RABBITMQ_MGMT_PORT:-19110}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RPSD_RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RPSD_RABBITMQ_PASS:-guest}
+    volumes:
+      - rpsd-rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - rpsd-network
+
+volumes:
+  rpsd-rabbitmq-data:
+    name: rpsd-rabbitmq-data
