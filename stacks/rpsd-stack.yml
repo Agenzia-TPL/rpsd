@@ -389,7 +389,7 @@ services:
       # Coordination overrides (take precedence over env_file)
       DATABASES__default__HOST: config-db
       DATABASES__default__PORT: "5432"
-      KEYCLOAK_DISCOVERY_URL: http://keycloak:8080/realms/rapsodia/.well-known/openid-configuration
+      KEYCLOAK_DISCOVERY_URL: http://keycloak:8080/realms/rpsd/.well-known/openid-configuration
     networks:
       - rpsd-network
     deploy:
