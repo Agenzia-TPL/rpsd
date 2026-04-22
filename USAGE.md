@@ -41,6 +41,26 @@ cd rpsd
 ./scripts/stop-shared.sh
 ```
 
+### M2M ingest authz checklist (realm `rpsd`)
+
+For contract-scoped machine-to-machine ingestion:
+
+1. Ensure Keycloak realm import is `rpsd` and includes:
+   - client `rpsd-config-admin-api` with service account enabled;
+   - service-account roles `view-clients`, `query-clients`, `manage-clients`.
+2. Ensure `rpsd-config` runtime has:
+   - `KEYCLOAK_ADMIN_CLIENT_SECRET`;
+   - `M2M_SECRET_ENCRYPTION_KEY`;
+   - `M2M_INTERNAL_AUTHZ_ALLOWED_CLIENTS_CSV` including `rpsd-ingest`.
+3. Ensure `rpsd-ingest` runtime has:
+   - `JWT_AUTH__ENABLED=true`;
+   - `JWT_AUTH__ISSUER_URL=http://localhost:19300/realms/rpsd` (or deployment URL);
+   - `JWT_AUTH__AUDIENCE` aligned to ingest client audience;
+   - `JWT_AUTH__JWKS_URL` set to the realm JWKS endpoint;
+   - `CONFIG_AUTHZ__URL` pointing to `http://rpsd-config:8000/internal/authz/check`.
+4. Validate end-to-end with runbook:
+   - `specs/features/m2m-ingest-contract-authz/runbook-e2e-local.md`.
+
 ---
 
 ## CI/CD Setup (GitHub Actions + ghcr.io)
