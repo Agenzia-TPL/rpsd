@@ -7,7 +7,8 @@ This script demonstrates the intended machine-to-machine flow:
 
 1. exchange company client_id/client_secret for a Keycloak access token;
 2. call rpsd-config M2M APIs without a Django user;
-3. submit a file to rpsd-ingest using the same Bearer token.
+3. ask rpsd-config if this client can ingest this data category;
+4. submit a file to rpsd-ingest using the same Bearer token.
 """
 
 from __future__ import annotations
@@ -17,12 +18,23 @@ import json
 import mimetypes
 import os
 import sys
+import time
+from dataclasses import dataclass
 from pathlib import Path
 from urllib import parse, request
 
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_FILE = ROOT / "sample_dataset.json"
+
+
+@dataclass(frozen=True)
+class AccessToken:
+    value: str
+    expires_at: float
+
+    def expires_soon(self, *, skew_seconds: int = 30) -> bool:
+        return time.time() >= self.expires_at - skew_seconds
 
 
 def env(name: str, default: str = "", *, required: bool = False) -> str:
@@ -60,7 +72,7 @@ def http_json(
         raise SystemExit(f"HTTP call failed: {method} {url}\n{exc}") from exc
 
 
-def get_client_credentials_token() -> str:
+def get_client_credentials_token() -> AccessToken:
     token_url = env(
         "RPSD_KEYCLOAK_TOKEN_URL",
         "http://localhost:19300/realms/rpsd/protocol/openid-connect/token",
@@ -79,7 +91,31 @@ def get_client_credentials_token() -> str:
     token = payload.get("access_token") if isinstance(payload, dict) else None
     if not isinstance(token, str) or not token:
         raise SystemExit("Token response does not contain access_token.")
-    return token
+    expires_in = payload.get("expires_in", 300)
+    try:
+        expires_in_seconds = int(expires_in)
+    except (TypeError, ValueError):
+        expires_in_seconds = 300
+    return AccessToken(value=token, expires_at=time.time() + expires_in_seconds)
+
+
+def authorize_ingest(
+    token: str,
+    *,
+    config_base: str,
+    contract_code: str,
+    data_category: str,
+) -> dict:
+    query = parse.urlencode({"data_category": data_category})
+    response = http_json(
+        "GET",
+        (
+            f"{config_base}/exchange_agreement/api/m2m/v1/contracts/"
+            f"{parse.quote(contract_code, safe='')}/ingest-authorization?{query}"
+        ),
+        token=token,
+    )
+    return response if isinstance(response, dict) else {"response": response}
 
 
 def submit_file_to_ingest(
@@ -117,13 +153,13 @@ def main() -> int:
     contract_code = env("RPSD_CONTRACT_CODE", "CTR-001")
     data_category = env("RPSD_DATA_CATEGORY", "netex")
 
-    token = get_client_credentials_token()
+    access_token = get_client_credentials_token()
     print("M2M token obtained.")
 
     me = http_json(
         "GET",
         f"{config_base}/exchange_agreement/api/m2m/v1/me",
-        token=token,
+        token=access_token.value,
     )
     print("M2M identity:")
     print(json.dumps(me, indent=2, ensure_ascii=False))
@@ -131,13 +167,26 @@ def main() -> int:
     contract = http_json(
         "GET",
         f"{config_base}/exchange_agreement/api/m2m/v1/contracts/{contract_code}",
-        token=token,
+        token=access_token.value,
     )
     print("Authorized contract:")
     print(json.dumps(contract, indent=2, ensure_ascii=False))
 
+    authorization = authorize_ingest(
+        access_token.value,
+        config_base=config_base,
+        contract_code=contract_code,
+        data_category=data_category,
+    )
+    print("Ingest authorization:")
+    print(json.dumps(authorization, indent=2, ensure_ascii=False))
+
+    if access_token.expires_soon():
+        access_token = get_client_credentials_token()
+        print("M2M token refreshed before ingest submission.")
+
     result = submit_file_to_ingest(
-        token,
+        access_token.value,
         contract_code=contract_code,
         data_category=data_category,
     )
