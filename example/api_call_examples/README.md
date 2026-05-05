@@ -48,6 +48,58 @@ example/api_call_examples/sample_dataset.json
 Usa le credenziali M2M dell'azienda TPL, visibili dalla UI del dettaglio
 contratto o dalla pagina azienda.
 
+### Uso con file JSON
+
+Metodo consigliato per un'integrazione aziendale: lo script resta generico e
+credenziali/endpoint stanno in un file di configurazione esterno.
+
+Esempio:
+
+```json
+{
+  "client_id": "atm-milano-default-prod",
+  "client_secret": "REPLACE_WITH_CLIENT_SECRET",
+  "contract_code": "001002",
+  "data_category": "netex",
+  "token_url": "http://localhost:19300/realms/rpsd/protocol/openid-connect/token",
+  "config_base_url": "http://localhost:20100",
+  "ingest_url": "http://localhost:20000/ingest",
+  "file_path": "example/api_call_examples/sample_dataset.json",
+  "content_type": "application/json"
+}
+```
+
+Nel repo e' disponibile un template:
+
+```bash
+example/api_call_examples/m2m_config.sample.json
+```
+
+Esecuzione:
+
+```bash
+cd /home/davide/dati/60_lavoro/003_agb/30_rapsodia/20_rpsd/rpsd
+
+python3 example/api_call_examples/m2m_send_file.py \
+  --config example/api_call_examples/m2m_config.sample.json
+```
+
+Per inviare un file diverso da quello indicato nel JSON:
+
+```bash
+python3 example/api_call_examples/m2m_send_file.py \
+  --config example/api_call_examples/m2m_config.sample.json \
+  --file /percorso/al/file.json
+```
+
+Il file JSON puo' contenere il `client_secret`: va quindi trattato come
+materiale sensibile, non va committato con valori reali e va condiviso solo con
+i referenti autorizzati dell'azienda.
+
+### Uso con variabili d'ambiente
+
+Le variabili d'ambiente restano utili per test locali o automazioni CI.
+
 ```bash
 cd /home/davide/dati/60_lavoro/003_agb/30_rapsodia/20_rpsd/rpsd
 
@@ -57,6 +109,12 @@ export RPSD_CONTRACT_CODE="mil-1-202605"
 export RPSD_DATA_CATEGORY="netex"
 
 python3 example/api_call_examples/m2m_send_file.py
+```
+
+Precedenza dei valori:
+
+```text
+argomenti CLI > variabili d'ambiente > file JSON > default locali
 ```
 
 Flusso:
