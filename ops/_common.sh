@@ -48,6 +48,18 @@ log_error() {
   printf '[ERROR] %s\n' "$1" >&2
 }
 
+print_bootstrap_scope() {
+  cat <<'EOF'
+Scope bootstrap locale:
+  - copre i servizi disponibili oggi: rpsd-config, rpsd-ingest e Keycloak;
+  - usa rpsd/scripts come primitive granulari di setup/start/stop/status;
+  - aggiunge inizializzazione operativa: env, secret Keycloak, admin locale,
+    migrazioni Django e superuser.
+  - non sostituisce gli script granulari e non e' ancora bootstrap completo
+    di ogni futura componente della piattaforma.
+EOF
+}
+
 require_workspace() {
   if [[ ! -d "${RPSD_DIR}" ]]; then
     log_error "Repository rpsd non trovato in: ${RPSD_DIR}"

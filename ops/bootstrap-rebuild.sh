@@ -54,6 +54,7 @@ if [[ "${ONLY_CONFIG}" == "true" ]]; then
 else
   echo "=== Bootstrap rebuild servizi applicativi RPSD ==="
 fi
+print_bootstrap_scope
 echo "I servizi condivisi non vengono fermati."
 
 if [[ "${SETUP_FORCE}" == "true" ]]; then

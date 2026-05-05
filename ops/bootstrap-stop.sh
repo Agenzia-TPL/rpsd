@@ -44,6 +44,7 @@ require_docker
 enter_rpsd_dir
 
 echo "=== Bootstrap stop piattaforma RPSD ==="
+print_bootstrap_scope
 
 log_step "1/3" "Stop servizi applicativi"
 bash scripts/stop-services.sh || true

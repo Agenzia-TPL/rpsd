@@ -45,6 +45,7 @@ enter_rpsd_dir
 
 if [[ "${ONLY_CONFIG}" == "true" ]]; then
   echo "=== Bootstrap start rpsd-config ==="
+  print_bootstrap_scope
 
   log_step "1/5" "Verifica dipendenze rpsd-config"
   ensure_config_db_running
@@ -68,6 +69,7 @@ if [[ "${ONLY_CONFIG}" == "true" ]]; then
 fi
 
 echo "=== Bootstrap start piattaforma RPSD ==="
+print_bootstrap_scope
 
 log_step "1/7" "Setup environment files"
 bash scripts/setup.sh
