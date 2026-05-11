@@ -46,4 +46,4 @@ spec:
                   name: rpsd-secrets
                   key: rpsd-config-db-pass
             - name: KEYCLOAK_DISCOVERY_URL
-              value: http://keycloak:8080/realms/rapsodia/.well-known/openid-configuration
+              value: http://keycloak:8080/realms/rpsd/.well-known/openid-configuration

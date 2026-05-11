@@ -55,10 +55,12 @@ get_service_repos
 for name in "${SERVICE_NAMES[@]}"; do
   repo_dir="$PARENT_DIR/$name"
   if [ -d "$repo_dir" ]; then
-    if [ -f "$repo_dir/.env.base" ]; then
-      print_success "$name/.env.base exists"
+    if [ -f "$repo_dir/.env" ]; then
+      print_success "$name/.env exists"
+    elif [ -f "$repo_dir/.env.base" ]; then
+      print_warn "$name/.env missing (found legacy .env.base) — run scripts/setup.sh"
     else
-      print_warn "$name/.env.base missing — run scripts/setup.sh"
+      print_warn "$name/.env missing — run scripts/setup.sh"
     fi
   fi
 done
