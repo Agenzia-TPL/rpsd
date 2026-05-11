@@ -30,7 +30,7 @@ spec:
           command: ["sh", "-c", "until nc -z prefect-redis 6379; do echo waiting for prefect-redis; sleep 2; done"]
       containers:
         - name: prefect
-          image: prefecthq/prefect:3-latest
+          image: prefecthq/prefect:3.7.0-python3.14
           command: ["prefect", "server", "start", "--host", "0.0.0.0"]
           ports:
             - containerPort: 4200
