@@ -62,6 +62,7 @@ rpsd/
 | `setup.sh [--scenario name] [--service name] [--force]` | Generate `.env` in sibling service repos from their `.env.development` + scenario overrides |
 | `start-shared.sh [profiles...]` | Start shared infrastructure |
 | `stop-shared.sh [profiles...] [--clean]` | Stop shared infrastructure |
+| `update-shared.sh [profiles...] [--service name]...` | Pull newer images and recreate shared containers |
 | `start-services.sh [--except svc] [--build]` | Start application services |
 | `stop-services.sh` | Stop application services |
 | `status.sh` | Show platform status |

@@ -41,6 +41,33 @@ cd rpsd
 ./scripts/stop-shared.sh
 ```
 
+### Updating shared service images
+
+`start-shared.sh` does not re-pull images that are already cached locally.
+When a `:latest` tag has been republished upstream, or after you change a
+pinned `RPSD_IMAGE_*` version in `env/*` or a `compose/shared-*.yml`, use:
+
+```bash
+# Pull newer images and recreate everything in the "shared" profile
+./scripts/update-shared.sh
+
+# Restrict to specific profiles
+./scripts/update-shared.sh kafka prefect
+
+# Or target a single compose service by name (repeatable)
+./scripts/update-shared.sh --service rpsd-keycloak
+```
+
+The script runs `docker compose ... pull` followed by `up -d`, so only
+containers whose image digest or config actually changed are recreated.
+Volumes are preserved (there is no `--clean` flag). Bootstrap hooks done
+by `start-shared.sh` (Keycloak realm tweak, Kafka topic creation) are
+**not** re-applied — run `start-shared.sh` if you need them.
+
+For application services (`rpsd-ingest`, `rpsd-config`, `config-db`)
+the equivalent is a local rebuild via `start-services.sh --build`,
+not a registry pull.
+
 ---
 
 ## CI/CD Setup (GitHub Actions + ghcr.io)
