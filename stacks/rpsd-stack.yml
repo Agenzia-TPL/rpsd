@@ -213,7 +213,7 @@ services:
         delay: 5s
 
   prefect:
-    image: ${RPSD_IMAGE_PREFECT:-prefecthq/prefect:3-latest}
+    image: ${RPSD_IMAGE_PREFECT:-prefecthq/prefect:3.7.0-python3.14}
     command: prefect server start --host 0.0.0.0
     ports:
       - "${RPSD_PREFECT_PORT:-19200}:4200"

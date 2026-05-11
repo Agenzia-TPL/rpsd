@@ -36,7 +36,7 @@ services:
       - rpsd-network
 
   prefect:
-    image: ${RPSD_IMAGE_PREFECT:-prefecthq/prefect:3-latest}
+    image: ${RPSD_IMAGE_PREFECT:-prefecthq/prefect:3.7.0-python3.14}
     container_name: rpsd-prefect
     profiles: ["prefect", "shared", "all"]
     command: prefect server start --host 0.0.0.0
