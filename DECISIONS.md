@@ -87,9 +87,10 @@ This document is intended as a reference and starting point for implementing the
 1. `clone-repos.sh` — git clone all sibling repos into their sibling directories
 2. `start-shared.sh` — start shared services (Kafka/RabbitMQ, Prefect, Keycloak, PostgreSQL)
 3. `stop-shared.sh`
-4. `start-services.sh --except <service>` — start all rpsd-* services except specified ones
-5. `stop-services.sh`
-6. `status.sh` — show running containers and clone status of managed repos
+4. `update-shared.sh` — `docker compose pull` + `up -d` for the shared profile, so `:latest` republishes and pinned-tag bumps actually take effect (volumes preserved; bootstrap hooks not re-run)
+5. `start-services.sh --except <service>` — start all rpsd-* services except specified ones
+6. `stop-services.sh`
+7. `status.sh` — show running containers and clone status of managed repos
 
 ---
 
@@ -258,7 +259,7 @@ rpsd/
   shared/              # shared service configs (Keycloak, Kafka, config-db, Prefect)
   compose/             # Docker Compose include files, one per shared service group
   env/                 # rpsd-level .env.XXX.example files per service + image refs
-  scripts/             # clone-repos.sh, start-shared.sh, start-services.sh, etc.
+  scripts/             # clone-repos.sh, start-shared.sh, update-shared.sh, start-services.sh, etc.
   stacks/              # Docker Swarm stack files (future)
   charts/              # Helm charts for Kubernetes (future)
   manifests/           # raw k8s manifests if not using Helm (future)
