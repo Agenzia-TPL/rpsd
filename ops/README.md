@@ -47,7 +47,7 @@ bash rpsd/ops/bootstrap-rebuild.sh --help
 | servizi applicativi | avvio/rebuild/stop granulare | orchestra config/ingest nel flusso locale |
 | Keycloak admin locale | non gestito | crea/aggiorna `rpsd-admin` e gruppo `/rpsd/admin` |
 | secret Keycloak | non gestito | sincronizza secret reali in `rpsd-config/.env` |
-| Django config | non gestito | esegue migrazioni e superuser locale |
+| Django config | non gestito | esegue migrazioni, FlowProfile standard e superuser locale |
 | status/log finali | comandi granulari | riepilogo operativo e log utili |
 
 I wrapper root del workspace (`start.sh`, `stop.sh`, `rebuild.sh`) restano per
@@ -78,6 +78,16 @@ Django:
 username: rpsd-config-admin
 password: rpsd-config-admin
 ```
+
+## FlowProfile standard
+
+Il bootstrap applica anche `init_flow_profiles` su `rpsd-config`. Dopo una
+inizializzazione locale devono essere presenti i profili flussi dati standard:
+
+- `Standard TPL - Programmato + Real time`;
+- `Solo Programmato NeTEx`.
+
+La creazione di nuovi contratti richiede almeno un `FlowProfile` attivo.
 
 ## Note sicurezza
 

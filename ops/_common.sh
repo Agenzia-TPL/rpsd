@@ -270,6 +270,14 @@ bootstrap_django_superuser() {
   fi
   log_ok "Migrazioni Django applicate."
 
+  log_info "Inizializzo FlowProfile standard..."
+  if docker compose exec -T "${DJANGO_SERVICE}" sh -c \
+    "${DJANGO_PYTHON} src/rpsd_config/manage.py init_flow_profiles >/dev/null"; then
+    log_ok "FlowProfile standard pronti."
+  else
+    log_warn "Inizializzazione FlowProfile standard fallita."
+  fi
+
   log_info "Verifico superuser Django '${DJANGO_ADMIN_USERNAME}'..."
   if docker compose exec -T "${DJANGO_SERVICE}" sh -c \
     "${DJANGO_PYTHON} src/rpsd_config/manage.py shell" <<PY >/dev/null; then

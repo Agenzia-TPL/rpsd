@@ -69,6 +69,26 @@ Esempio:
 }
 ```
 
+`data_category` usa il nome canonico del file senza estensione, cioe il
+`what` registrato nei profili flusso di Config. Esempi validi:
+
+```text
+netex
+siri-pt
+siri-et
+siri-st
+siri-sm
+siri-vm
+siri-ct
+siri-cm
+siri-gm
+siri-fm
+siri-sx
+```
+
+Non usare varianti con underscore come `siri_pt`: i nomi SIRI usano il
+trattino per restare allineati ai file `siri-pt.xml` e `siri-pt.xsd`.
+
 Nel repo e' disponibile un template:
 
 ```bash

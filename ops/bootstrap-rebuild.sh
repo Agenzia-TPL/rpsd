@@ -58,11 +58,11 @@ print_bootstrap_scope
 echo "I servizi condivisi non vengono fermati."
 
 if [[ "${SETUP_FORCE}" == "true" ]]; then
-  log_step "0/4" "Rigenero file .env con scripts/setup.sh --force"
+  log_step "0/5" "Rigenero file .env con scripts/setup.sh --force"
   bash scripts/setup.sh --force
 fi
 
-log_step "1/4" "Verifica shared services principali"
+log_step "1/5" "Verifica shared services principali"
 for svc in rpsd-config-db rpsd-keycloak; do
   if container_running "${svc}"; then
     log_ok "${svc} in esecuzione"
@@ -72,22 +72,28 @@ for svc in rpsd-config-db rpsd-keycloak; do
 done
 
 if [[ "${ONLY_CONFIG}" == "true" ]]; then
-  log_step "2/4" "Rebuild + recreate solo rpsd-config"
+  log_step "2/5" "Rebuild + recreate solo rpsd-config"
   docker compose --profile config up -d --build --force-recreate --no-deps rpsd-config
 else
-  log_step "2/4" "Rebuild + recreate rpsd-config e rpsd-ingest"
+  log_step "2/5" "Rebuild + recreate rpsd-config e rpsd-ingest"
   docker compose --profile services up -d --build --force-recreate rpsd-config rpsd-ingest
 fi
 
 if [[ "${ONLY_CONFIG}" == "true" ]]; then
-  log_step "3/4" "Stato servizio rpsd-config"
+  log_step "3/5" "Bootstrap DB e configurazioni Django"
+  bootstrap_django_superuser
+
+  log_step "4/5" "Stato servizio rpsd-config"
   docker compose --profile config ps rpsd-config
 else
-  log_step "3/4" "Stato servizi applicativi"
+  log_step "3/5" "Bootstrap DB e configurazioni Django"
+  bootstrap_django_superuser
+
+  log_step "4/5" "Stato servizi applicativi"
   docker compose --profile services ps
 fi
 
-log_step "4/4" "Log recenti rpsd-config (tail 40)"
+log_step "5/5" "Log recenti rpsd-config (tail 40)"
 docker logs --tail 40 rpsd-config || true
 
 echo ""
