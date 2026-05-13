@@ -48,10 +48,12 @@ example/api_call_examples/sample_dataset.json
 Usa le credenziali M2M dell'azienda TPL, visibili dalla UI del dettaglio
 contratto o dalla pagina azienda.
 
-### Uso con file JSON
+### Configurazione integrazione
 
 Metodo consigliato per un'integrazione aziendale: lo script resta generico e
-credenziali/endpoint stanno in un file di configurazione esterno.
+credenziali, contratto ed endpoint stanno in un file di configurazione esterno.
+Questo file descrive la relazione stabile azienda-contratto, non il singolo
+file da inviare.
 
 Esempio:
 
@@ -60,17 +62,35 @@ Esempio:
   "client_id": "atm-milano-default-prod",
   "client_secret": "REPLACE_WITH_CLIENT_SECRET",
   "contract_code": "001002",
-  "data_category": "netex",
   "token_url": "http://localhost:19300/realms/rpsd/protocol/openid-connect/token",
   "config_base_url": "http://localhost:20100",
-  "ingest_url": "http://localhost:20000/ingest",
-  "file_path": "example/api_call_examples/sample_dataset.json",
-  "content_type": "application/json"
+  "ingest_url": "http://localhost:20000/ingest"
 }
 ```
 
-`data_category` usa il nome canonico del file senza estensione, cioe il
-`what` registrato nei profili flusso di Config. Esempi validi:
+Il file JSON puo' contenere il `client_secret`: va quindi trattato come
+materiale sensibile, non va committato con valori reali e va condiviso solo con
+i referenti autorizzati dell'azienda.
+
+Nel repo e' disponibile un template:
+
+```bash
+example/api_call_examples/m2m_config.sample.json
+```
+
+### Parametri del singolo invio
+
+Il tipo dato e il file inviato sono parametri della singola chiamata. Vanno
+passati da CLI, con default locali nello script per smoke test rapidi:
+
+```text
+--data-category netex
+--file example/api_call_examples/sample_dataset.json
+--content-type application/json
+```
+
+`data_category` usa il nome canonico del file senza estensione, cioe il `what`
+registrato nei profili flusso di Config. Esempi validi:
 
 ```text
 netex
@@ -89,32 +109,27 @@ siri-sx
 Non usare varianti con underscore come `siri_pt`: i nomi SIRI usano il
 trattino per restare allineati ai file `siri-pt.xml` e `siri-pt.xsd`.
 
-Nel repo e' disponibile un template:
-
-```bash
-example/api_call_examples/m2m_config.sample.json
-```
-
 Esecuzione:
 
 ```bash
 cd /home/davide/dati/60_lavoro/003_agb/30_rapsodia/20_rpsd/rpsd
 
 python3 example/api_call_examples/m2m_send_file.py \
-  --config example/api_call_examples/m2m_config.sample.json
+  --config example/api_call_examples/m2m_config.sample.json \
+  --data-category netex \
+  --file example/api_call_examples/sample_dataset.json \
+  --content-type application/json
 ```
 
-Per inviare un file diverso da quello indicato nel JSON:
+Per inviare un file diverso:
 
 ```bash
 python3 example/api_call_examples/m2m_send_file.py \
   --config example/api_call_examples/m2m_config.sample.json \
-  --file /percorso/al/file.json
+  --data-category siri-pt \
+  --file /percorso/al/siri-pt.xml \
+  --content-type application/xml
 ```
-
-Il file JSON puo' contenere il `client_secret`: va quindi trattato come
-materiale sensibile, non va committato con valori reali e va condiviso solo con
-i referenti autorizzati dell'azienda.
 
 ### Uso con variabili d'ambiente
 
@@ -127,6 +142,8 @@ export RPSD_M2M_CLIENT_ID="azienda-default-prod"
 export RPSD_M2M_CLIENT_SECRET="..."
 export RPSD_CONTRACT_CODE="mil-1-202605"
 export RPSD_DATA_CATEGORY="netex"
+export RPSD_FILE_PATH="example/api_call_examples/sample_dataset.json"
+export RPSD_CONTENT_TYPE="application/json"
 
 python3 example/api_call_examples/m2m_send_file.py
 ```
@@ -134,8 +151,12 @@ python3 example/api_call_examples/m2m_send_file.py
 Precedenza dei valori:
 
 ```text
-argomenti CLI > variabili d'ambiente > file JSON > default locali
+argomenti CLI > variabili d'ambiente > file JSON di integrazione > default locali
 ```
+
+Nota: `data_category`, `file_path` e `content_type` non sono proprieta stabili
+del contratto. Il file JSON di integrazione non dovrebbe contenerli; se
+presenti in vecchie copie locali vengono ignorati dallo script.
 
 Flusso:
 

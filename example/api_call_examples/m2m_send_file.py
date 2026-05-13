@@ -9,6 +9,11 @@ This script demonstrates the intended machine-to-machine flow:
 2. call rpsd-config M2M APIs without a Django user;
 3. ask rpsd-config if this client can ingest this data category;
 4. submit a file to rpsd-ingest using the same Bearer token.
+
+The optional JSON config describes the stable company/contract integration:
+client credentials, contract code and service endpoints. The file submitted to
+ingest is intentionally a per-call concern and should normally be passed from
+CLI with --data-category, --file and --content-type.
 """
 
 from __future__ import annotations
@@ -26,6 +31,8 @@ from urllib import parse, request
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_FILE = ROOT / "sample_dataset.json"
+DEFAULT_DATA_CATEGORY = "netex"
+DEFAULT_CONTENT_TYPE = "application/json"
 
 
 @dataclass(frozen=True)
@@ -64,6 +71,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--client-secret", help="M2M Keycloak client_secret.")
     parser.add_argument("--contract-code", help="Contract code used as metadata.who.")
     parser.add_argument("--data-category", help="Data category used as metadata.what.")
+    parser.add_argument("--content-type", help="Content type of the submitted file.")
     return parser.parse_args()
 
 
@@ -111,7 +119,7 @@ def setting(
 def build_runtime_config(args: argparse.Namespace) -> RuntimeConfig:
     config = load_config_file(args.config)
     file_path = setting(
-        config=config,
+        config={},
         key="file_path",
         env_name="RPSD_FILE_PATH",
         default=str(DEFAULT_FILE),
@@ -158,17 +166,19 @@ def build_runtime_config(args: argparse.Namespace) -> RuntimeConfig:
             cli_value=args.contract_code,
         ),
         data_category=setting(
-            config=config,
+            config={},
             key="data_category",
             env_name="RPSD_DATA_CATEGORY",
-            default="netex",
+            default=DEFAULT_DATA_CATEGORY,
             cli_value=args.data_category,
         ),
         file_path=Path(file_path),
         content_type=setting(
-            config=config,
+            config={},
             key="content_type",
             env_name="RPSD_CONTENT_TYPE",
+            default=DEFAULT_CONTENT_TYPE,
+            cli_value=args.content_type,
         ),
     )
 
