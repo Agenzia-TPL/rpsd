@@ -1,0 +1,10 @@
+{
+  "example": true,
+  "source": "api_call_examples",
+  "records": [
+    {
+      "id": "trip-001",
+      "status": "sample da sostituire con un file reale netex o siri"
+    }
+  ]
+}

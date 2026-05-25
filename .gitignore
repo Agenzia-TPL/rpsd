@@ -8,6 +8,10 @@ stacks/.env
 # Mounted data
 mnt/
 
+# Python-generated files
+__pycache__/
+*.py[oc]
+
 # macOS
 .DS_Store
 
