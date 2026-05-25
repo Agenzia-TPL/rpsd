@@ -29,6 +29,8 @@ services:
     build:
       context: ../../rpsd-config
       dockerfile: ./Dockerfile
+      additional_contexts:
+        rpsd-commons: ../../rpsd-commons
     image: ${RPSD_IMAGE_CONFIG:-rpsd-config:local}
     container_name: rpsd-config
     profiles: ["config", "services", "all"]

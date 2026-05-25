@@ -1,0 +1,8 @@
+{
+  "client_id": "atm-milano-default-prod",
+  "client_secret": "REPLACE_WITH_CLIENT_SECRET",
+  "contract_code": "001002",
+  "token_url": "http://localhost:19300/realms/rpsd/protocol/openid-connect/token",
+  "config_base_url": "http://localhost:20100",
+  "ingest_url": "http://localhost:20000/ingest"
+}
